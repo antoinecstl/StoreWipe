@@ -264,8 +264,6 @@ struct DecisionStamp: View {
     }
 }
 
-extension Color {
-    /// Couleurs de décision définies dans le catalogue (contraste vérifié avec du texte blanc).
-    static let keepTint = Color("KeepTint")
-    static let deleteTint = Color("DeleteTint")
-}
+// `Color.keepTint` et `Color.deleteTint` sont générés par Xcode à partir du catalogue
+// d'assets (ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS) ; contraste
+// vérifié avec du texte blanc.

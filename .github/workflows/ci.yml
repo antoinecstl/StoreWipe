@@ -41,7 +41,7 @@ jobs:
         run: |
           xcodebuild -project PhotoSwipe.xcodeproj -scheme PhotoSwipe \
             -destination 'generic/platform=iOS Simulator' \
-            -configuration Debug CODE_SIGNING_ALLOWED=NO build
+            -configuration Debug CODE_SIGNING_ALLOWED=NO ARCHS=arm64 build
       - name: Compilation Release (simulateur, sans signature)
         run: |
           xcodebuild -project PhotoSwipe.xcodeproj -scheme PhotoSwipe \
