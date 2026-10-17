@@ -1,6 +1,7 @@
 import Foundation
 import OSLog
 import Photos
+import PhotosUI
 import PhotoSwipeCore
 import UIKit
 
