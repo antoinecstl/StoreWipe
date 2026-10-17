@@ -74,7 +74,7 @@
 
 ### ADR-008 — Cible app en Swift 5 + vérification de concurrence « complete »
 **Décision** : le paquet est en Swift 6 (vérifié ici). La cible app, non compilable dans cet environnement, est en Swift 5 avec `SWIFT_STRICT_CONCURRENCY = complete` : les éventuels problèmes de concurrence liés aux annotations PhotoKit apparaissent en avertissements, pas en erreurs bloquantes.
-**Suite** : passer la cible en Swift 6 après une première compilation propre sous Xcode (backlog F-03).
+**Constat** : première compilation CI (Xcode 26.3) sans aucun avertissement avec cette vérification. **Suite** : passer la cible en Swift 6 (backlog F-03).
 
 ### ADR-009 — Projet Xcode à dossiers synchronisés, signature hors dépôt
 **Décision** : `project.pbxproj` au format Xcode 16 (`PBXFileSystemSynchronizedRootGroup`) : tout fichier ajouté sous `PhotoSwipe/` est compilé ou embarqué sans modifier le projet. Équipe et identifiant de bundle viennent de `Config/Local.xcconfig` (ignoré par git) via `Config/Shared.xcconfig`.

@@ -1,6 +1,6 @@
 # Backlog priorisé
 
-Légende : ✅ fait et testé (tests du paquet, Linux) · 🟡 implémenté, non compilé ni exécuté dans l'environnement de développement actuel (pas de Xcode) · ⬜ à faire.
+Légende : ✅ fait et testé (tests du paquet, Linux et macOS) · 🟡 implémenté et compilé par la CI (Xcode 26.3), non exécuté sur simulateur ni sur appareil · ⬜ à faire.
 
 ## Incrément A — Cadrage et fondations ✅
 
@@ -8,8 +8,8 @@ Légende : ✅ fait et testé (tests du paquet, Linux) · 🟡 implémenté, non
 |----|---------|------------------------|--------|
 | A-01 | PRD, parcours, ADR, modèle de données, spécification des doublons | Documents dans `docs/` | ✅ |
 | A-02 | Paquet `PhotoSwipeKit` (Core, Store, Features) | Compile en mode Swift 6 sans avertissement ; tests verts | ✅ |
-| A-03 | Projet Xcode à dossiers synchronisés, signature via xcconfig local | S'ouvre dans Xcode 16+, compile pour le simulateur | 🟡 structure validée par analyse du fichier ; compilation à confirmer |
-| A-04 | CI : tests Linux du paquet + compilation iOS sur macOS | Workflow GitHub Actions | 🟡 |
+| A-03 | Projet Xcode à dossiers synchronisés, signature via xcconfig local | Compile pour le simulateur en Debug et Release | ✅ CI (Xcode 26.3, 0 avertissement) ; ouverture dans l'interface Xcode à confirmer |
+| A-04 | CI : tests Linux du paquet + compilation iOS sur macOS | Workflow GitHub Actions vert | ✅ |
 
 ## Incrément B — Tri manuel, persistance, permissions
 

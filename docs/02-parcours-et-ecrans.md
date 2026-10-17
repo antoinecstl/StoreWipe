@@ -1,6 +1,6 @@
 # Parcours et écrans
 
-Statuts : ✅ implémenté (logique testée hors Xcode) · 🟡 implémenté, interface non compilée dans cet environnement · ⬜ à faire (incrément indiqué).
+Statuts : ✅ implémenté (logique testée automatiquement) · 🟡 implémenté et compilé par la CI (Xcode 26.3), pas encore exécuté sur simulateur ni sur appareil · ⬜ à faire (incrément indiqué).
 
 ## 1. Parcours
 

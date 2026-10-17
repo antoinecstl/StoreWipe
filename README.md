@@ -2,7 +2,7 @@
 
 Application iPhone de tri de photos : **swipe à droite pour conserver, à gauche pour mettre de côté à supprimer**. Tout est traité sur l'appareil, sans compte, et rien n'est supprimé sans validation explicite puis confirmation d'iOS.
 
-> État : incréments **A** (cadrage, fondations) et **B** (tri manuel, persistance, permissions) implémentés. La logique est testée (71 tests) ; l'interface iOS n'a pas encore été compilée ni exécutée sur Mac — voir le [rapport de validation](docs/09-rapport-de-validation.md).
+> État : incréments **A** (cadrage, fondations) et **B** (tri manuel, persistance, permissions) implémentés. La logique est testée (71 tests, Linux et macOS) ; l'app iOS compile en Debug et Release (CI, Xcode 26.3, 0 avertissement) mais n'a pas encore été exécutée sur simulateur ni sur appareil — voir le [rapport de validation](docs/09-rapport-de-validation.md).
 
 ## Structure
 

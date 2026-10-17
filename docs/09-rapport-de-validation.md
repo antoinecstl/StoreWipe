@@ -11,7 +11,7 @@ Date : 17/10/2026. Ce rapport sépare strictement ce qui a été **exécuté et 
 | Xcode, simulateur iOS, appareil | **Indisponibles** |
 | Accès réseau | Hugging Face et download.swift.org bloqués par la politique réseau de l'environnement |
 
-Conséquence : le paquet `PhotoSwipeKit` est compilé et testé ; la cible iOS (SwiftUI, PhotoKit, UIKit) **n'a été ni compilée ni exécutée** ici. La CI GitHub Actions (`.github/workflows/ci.yml`) compile l'app pour le simulateur sur macOS ; son résultat est indiqué en §4 lorsqu'il est disponible.
+Conséquence : le paquet `PhotoSwipeKit` est compilé et testé ici ; la cible iOS (SwiftUI, PhotoKit, UIKit) est compilée par la CI GitHub Actions sur macOS (§4). **Aucune exécution** de l'app n'a eu lieu, ni sur simulateur ni sur appareil.
 
 ## 2. Exécuté et vérifié
 
@@ -24,6 +24,8 @@ Conséquence : le paquet `PhotoSwipeKit` est compilé et testé ; la cible iOS (
 | Icône 1024 × 1024 RVB sans canal alpha | ✅ |
 | Contraste texte blanc / couleurs de décision (WCAG) | ✅ Conserver 5,4:1 ; À supprimer 5,9:1 ; accent 7,9:1 (clair) et 5,4:1 (sombre) |
 | `AppSettings` (Observation + `didSet`) compilé et exécuté sous Linux en Swift 5 / concurrence complète | ✅ |
+| Tests du paquet sous macOS (module `SQLite3` d'Apple) — CI | ✅ |
+| Compilation de l'app iOS, simulateur, Debug (arm64) et Release — CI, Xcode 26.3 (17C529), SDK iOS Simulator 26.2, `SWIFT_STRICT_CONCURRENCY = complete` | ✅ 0 erreur, 0 avertissement Swift |
 
 ### Couverture fonctionnelle des tests
 
@@ -45,8 +47,8 @@ Conséquence : le paquet `PhotoSwipeKit` est compilé et testé ; la cible iOS (
 
 | Élément | Où | Priorité |
 |---------|----|----------|
-| Compilation de la cible iOS | CI macOS ou Xcode local | Bloquant |
-| Ouverture du projet dans Xcode (format objectVersion 77, référence de paquet local) | Xcode 16+ | Bloquant |
+| Ouverture du projet dans l'interface Xcode (`xcodebuild` le lit correctement) | Xcode 16+ | Haute |
+| Compilation avec Xcode 16 (seul Xcode 26.3 a été utilisé) | Xcode 16 | Basse |
 | Parcours complet sur simulateur en mode démonstration | Simulateur | Haute |
 | Permissions réelles (complet, limité, refusé, restreint, changements dans Réglages) | Appareil | Haute |
 | Énumération PhotoKit, notifications de changement, photos masquées, albums partagés exclus | Appareil | Haute |
@@ -59,6 +61,12 @@ Conséquence : le paquet `PhotoSwipeKit` est compilé et testé ; la cible iOS (
 
 Aucun résultat de simulateur ne sera présenté comme une validation matérielle.
 
-## 4. CI
+## 4. CI (GitHub Actions)
 
-Résultat de la première exécution : voir la section mise à jour après l'exécution (ou l'onglet Actions du dépôt).
+| Run | Commit | Résultat | Détail |
+|-----|--------|----------|--------|
+| 1 | `f0b6981` | ❌ | Redéclaration de `Color.keepTint` / `Color.deleteTint` : Xcode génère déjà ces symboles depuis le catalogue d'assets. Tests du paquet verts (Linux et macOS). |
+| 2 | `cee22ba` | ❌ | `presentLimitedLibraryPicker` introuvable : la méthode est déclarée dans PhotosUI. |
+| 3 | `8afd498` | ✅ | Tests Linux, tests macOS, compilation Debug et Release : aucune erreur, aucun avertissement Swift. |
+
+Les deux erreurs étaient des erreurs de compilation détectées avant toute exécution ; aucune ne concernait la logique testée du paquet.
