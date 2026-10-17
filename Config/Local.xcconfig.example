@@ -1,0 +1,3 @@
+// Copier en Config/Local.xcconfig (non versionné) puis renseigner.
+DEVELOPMENT_TEAM = ABCDE12345
+PHOTOSWIPE_BUNDLE_ID_PREFIX = com.votre-domaine

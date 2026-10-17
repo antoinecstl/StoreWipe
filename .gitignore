@@ -1,0 +1,30 @@
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/PhotoSwipeKit/.build/
+Package.resolved
+
+# Signature et réglages locaux (jamais versionnés)
+Config/Local.xcconfig
+*.p12
+*.mobileprovision
+*.cer
+*.p8
+
+# Préparation du modèle (poids, jeux de données, sorties)
+Tools/model-prep/.venv/
+Tools/model-prep/weights/
+Tools/model-prep/data/
+Tools/model-prep/output/
+
+# Divers
+.DS_Store

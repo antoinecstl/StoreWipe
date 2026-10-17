@@ -1,0 +1,10 @@
+// Réglages de signature partagés, sans donnée personnelle.
+// Copiez Config/Local.xcconfig.example en Config/Local.xcconfig (ignoré par git)
+// pour renseigner votre équipe et votre préfixe d'identifiant.
+
+PHOTOSWIPE_BUNDLE_ID_PREFIX = com.example
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"
+
+PRODUCT_BUNDLE_IDENTIFIER = $(PHOTOSWIPE_BUNDLE_ID_PREFIX).photoswipe

@@ -1,0 +1,98 @@
+{
+  "sourceLanguage" : "fr",
+  "strings" : {
+    "%lld photos" : {
+      "comment" : "Accord au pluriel (français : « one » couvre 0 et 1).",
+      "localizations" : {
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photo"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld photos à trier" : {
+      "comment" : "Accord au pluriel (français : « one » couvre 0 et 1).",
+      "localizations" : {
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photo à trier"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photos à trier"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld restantes" : {
+      "comment" : "Accord au pluriel (français : « one » couvre 0 et 1).",
+      "localizations" : {
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld restante"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld restantes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Lecture de la photothèque… %lld photos lues" : {
+      "comment" : "Accord au pluriel (français : « one » couvre 0 et 1).",
+      "localizations" : {
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Lecture de la photothèque… %lld photo lue"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Lecture de la photothèque… %lld photos lues"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
