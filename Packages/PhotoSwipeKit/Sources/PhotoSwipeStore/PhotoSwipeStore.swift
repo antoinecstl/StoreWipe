@@ -593,7 +593,7 @@ public actor PhotoSwipeStore {
             clauses.append("(a.subtypes & \(AssetSubtypes.screenshot.rawValue)) != 0")
         case .category(let key):
             let rule = try category(forKey: key)?.rule
-            let condition = rule.map(Self.condition(for:)) ?? ("0", [])
+            let condition: (sql: String, arguments: [SQLValue]) = rule.map { Self.condition(for: $0) } ?? ("0", [])
             clauses.append(condition.sql)
             arguments += condition.arguments
         }
