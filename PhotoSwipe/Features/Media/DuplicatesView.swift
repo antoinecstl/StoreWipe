@@ -1,4 +1,5 @@
 import PhotoSwipeCore
+import PhotoSwipeFeatures
 import SwiftUI
 
 /// Doublons : exacts (octets identiques, prouvés par empreinte SHA-256) puis probables (mêmes dimensions,

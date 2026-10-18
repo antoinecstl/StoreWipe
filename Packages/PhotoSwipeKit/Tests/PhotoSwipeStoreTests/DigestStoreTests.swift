@@ -95,7 +95,8 @@ struct DigestStoreTests {
         }
         let groups = try await store.exactDuplicateGroups()
         #expect(groups.count == 2)
-        #expect(groups.allSatisfy(\.isExact))
+        let allExact = groups.allSatisfy { $0.isExact }
+        #expect(allExact)
         // La vidéo (plus lourde) libère le plus de place : elle vient d'abord.
         #expect(Set(groups[0].members.map(\.id)) == ["v1", "v2"])
         // Même empreinte, même date ou non : c'est le contenu qui compte.
