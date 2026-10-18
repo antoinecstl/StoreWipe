@@ -21,7 +21,7 @@ struct FakeSizer: AssetSizing {
 struct SizeScanTests {
     @Test func measuresEverythingAndSkipsUnknownWithoutLooping() async throws {
         let store = try await indexedStore(library(450))
-        let sizer = FakeSizer { id in id.rawValue == "p003" ? nil : 2_000_000 }
+        let sizer = FakeSizer { id in id.rawValue == "p03" ? nil : 2_000_000 }
         let coordinator = SizeScanCoordinator(store: store, sizer: sizer)
         coordinator.start()
         await coordinator.waitUntilIdle()
