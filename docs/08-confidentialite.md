@@ -31,3 +31,7 @@ Protection du fichier de base : `completeUntilFirstUserAuthentication` (permet u
 4. efface les réglages et revient à l'écran de bienvenue.
 
 Aucune photo de la photothèque n'est modifiée ou supprimée par cette action.
+
+## 4. Analyse locale des photos (réglage facultatif)
+
+Quand l'utilisateur active « Reconnaître mes photos », chaque photo est lue en version réduite par les API Vision du système, sur l'appareil. Sont enregistrés dans la base locale : des étiquettes de contenu avec leur confiance, un indicateur « utilitaire », un score d'esthétique, la part de surface couverte par du texte et le nombre de caractères reconnus. **Le texte reconnu, les images et leurs miniatures ne sont jamais conservés ni journalisés.** Aucun réseau n'est utilisé (une photo uniquement présente dans iCloud est ignorée). « Effacer les données de l'application » supprime ces résultats et les catégories créées par l'utilisateur ; désactiver l'analyse l'arrête sans effacer les résultats.

@@ -59,12 +59,12 @@ Légende : ✅ fait et testé (tests du paquet, Linux et macOS) · 🟡 impléme
 
 | ID | Élément | Critères d'acceptation |
 |----|---------|------------------------|
-| E-00 | **Décision licence** | Modèle retenu avec licence compatible vérifiée sur source primaire |
+| E-00 | **Décision licence** | Modèle retenu avec licence compatible vérifiée sur source primaire | ⏸ non nécessaire pour la version Vision (voir [07](07-classification-locale.md#0-version-actuelle-vision-sans-modèle-embarqué)) |
 | E-01 | Scripts `Tools/model-prep` | Export reproductible, vecteurs textuels précalculés, comparaison original/converti |
 | E-02 | Évaluation | Rapport par catégorie (précision, rappel, confusion, incertains, latence, mémoire, taille) |
-| E-03 | Migration v3 `analyses` + `ScanCoordinator` | Pause, reprise, annulation, adaptation thermique et économie d'énergie, points de reprise |
-| E-04 | Piles par catégorie | Raison affichée ; incertain exclu ; tri manuel inchangé sans modèle |
-| E-05 | Aucun appel réseau d'inférence | Vérifié (pas de code réseau ; test sur appareil en mode avion) |
+| E-03 | Migration `analyses` + coordinateur d'analyse | Pause, reprise, annulation, adaptation thermique et économie d'énergie, points de reprise | ✅ logique (migration v2, `AnalysisCoordinator`) · 🟡 Vision sur appareil |
+| E-04 | Piles par catégorie | Raison affichée ; incertain exclu ; tri manuel inchangé sans modèle | 🟡 piles et catégories personnalisées ; raison affichée à faire |
+| E-05 | Aucun appel réseau d'inférence | Vérifié (pas de code réseau ; test sur appareil en mode avion) | 🟡 aucun code réseau ; test en mode avion à faire |
 
 ## Incrément F — Optimisation, accessibilité, TestFlight
 

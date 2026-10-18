@@ -1,6 +1,19 @@
 # Prétri intelligent local — cadrage et plan d'évaluation (incrément E)
 
-Statut : **cadrage.** Aucun modèle n'est intégré. Le tri manuel ne dépend d'aucune analyse.
+Statut : **première version livrée avec les API Vision du système** (18/10/2026) ; aucun modèle externe n'est embarqué. Le tri manuel ne dépend d'aucune analyse.
+
+## 0. Version actuelle (Vision, sans modèle embarqué)
+
+Choix : commencer par ce qui n'a ni licence de poids ni téléchargement, et qui fonctionne tout de suite sur l'appareil.
+
+- **Analyse** (`VisionImageAnalyzer`) : `ClassifyImageRequest` (étiquettes de contenu), `CalculateImageAestheticsScoresRequest` (`isUtility`, score global), reconnaissance de texte rapide (seule la couverture de surface et le nombre de caractères sont gardés, jamais le texte). Image réduite à 1024 px, jamais de réseau (photo uniquement dans iCloud : ignorée).
+- **Stockage** : migration v2 (`analyses`, `analysis_labels`, `categories`). Rien qui permette de reconstituer une image.
+- **Catégories intégrées** : « Documents, reçus et notes » (jugé utilitaire ou très couvert de texte, hors captures d'écran) et « Photos peu réussies » (score d'esthétique bas, hors utilitaires et captures). Les captures d'écran restent détectées par les métadonnées.
+- **Catégories de l'utilisateur** : choisies parmi les étiquettes réellement trouvées dans sa photothèque (recherche aidée par quelques mots français). Pas de description libre en phrase.
+- **Marquage en lot** : « tout marquer à supprimer » sur une pile, après confirmation ; la sélection est ensuite revue puis supprimée via le système.
+
+Limites connues : la liste des étiquettes de Vision n'est pas publiée et dépend de la version d'iOS ; les seuils (0,25 de couverture de texte, -0,3 d'esthétique) sont des valeurs de départ à ajuster d'après les résultats réels sur appareil. Le classement par description libre (type CLIP) reste l'objectif de l'incrément E ci-dessous.
+
 
 ## 1. Taxonomie : des attributs indépendants
 

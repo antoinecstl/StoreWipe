@@ -50,7 +50,7 @@ Le succès ne se mesure pas au nombre de suppressions. Sans télémétrie extern
 ## 6. Décisions produit déjà prises (réversibles)
 
 - iPhone uniquement, orientation portrait.
-- Ordre de présentation : des plus récentes aux plus anciennes.
+- Ordre de présentation : des plus anciennes aux plus récentes par défaut (réglable dans les Réglages ; les sessions déjà commencées gardent leur ordre).
 - « Passer » = **reportée** : la photo n'est plus proposée dans la session en cours et revient lors d'une session ultérieure, après les photos jamais examinées.
 - Une seule session active : en démarrer une autre (par exemple un mois) clôt la précédente sans perdre aucune décision.
 - Les photos conservées ne reviennent que via « Revoir les photos conservées ».
