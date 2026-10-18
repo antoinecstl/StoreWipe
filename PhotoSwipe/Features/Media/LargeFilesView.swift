@@ -23,7 +23,6 @@ struct LargeFilesView: View {
     private static let thresholdsInMegabytes = [10, 50, 100, 250, 500, 1000]
 
     @State private var filter: KindFilter = .all
-    @State private var thresholdMB = 50
     @State private var items: [LargeAsset] = []
     @State private var summary = SizeSummary()
     @State private var selection: Set<AssetID> = []
@@ -37,6 +36,18 @@ struct LargeFilesView: View {
         let threshold: Int
         let revision: Int
         let marked: Int
+    }
+
+    /// Même seuil que la pile « Gros fichiers » de l'accueil.
+    private var thresholdMB: Int { environment.settings.largeFileThresholdMB }
+    private var thresholdBinding: Binding<Int> {
+        Binding(
+            get: { environment.settings.largeFileThresholdMB },
+            set: { value in
+                environment.settings.largeFileThresholdMB = value
+                Task { await environment.applyMediaSettings() }
+            }
+        )
     }
 
     private var minBytes: Int64 { Int64(thresholdMB) * 1_000_000 }
@@ -122,11 +133,15 @@ struct LargeFilesView: View {
                 Text("Vidéos").tag(KindFilter.videos)
             }
             .pickerStyle(.segmented)
-            Picker("Taille minimale", selection: $thresholdMB) {
+            Picker("Taille minimale", selection: thresholdBinding) {
                 ForEach(Self.thresholdsInMegabytes, id: \.self) { value in
-                    Text(value >= 1000 ? "\(value / 1000) Go" : "\(value) Mo").tag(value)
+                    Text(DisplayFormat.thresholdLabel(megabytes: value)).tag(value)
                 }
             }
+            NavigationLink(value: Route.sort(SessionScope(filter: .large(megabytes: thresholdMB, kind: filter.kind)))) {
+                Label("Trier un par un, du plus lourd au plus léger", systemImage: "hand.draw")
+            }
+            .disabled(summary.count == 0)
         }
     }
 

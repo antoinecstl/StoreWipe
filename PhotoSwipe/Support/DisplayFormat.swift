@@ -13,6 +13,11 @@ enum DisplayFormat {
         return text.prefix(1).uppercased() + text.dropFirst()
     }
 
+    /// Seuil lisible d'un filtre de taille (« 50 Mo », « 1 Go »).
+    static func thresholdLabel(megabytes: Int) -> String {
+        megabytes >= 1000 ? String(localized: "\(megabytes / 1000) Go") : String(localized: "\(megabytes) Mo")
+    }
+
     /// Taille lisible (« 85 Mo »), jamais présentée comme de l'espace garanti libéré.
     static func byteCount(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
@@ -55,6 +60,13 @@ enum DisplayFormat {
             base = String(localized: "Captures d'écran")
         case .videos:
             base = String(localized: "Vidéos")
+        case .large(let megabytes, let kind):
+            let threshold = thresholdLabel(megabytes: megabytes)
+            switch kind {
+            case nil: base = String(localized: "Gros fichiers (≥ \(threshold))")
+            case .image?: base = String(localized: "Grosses photos (≥ \(threshold))")
+            case .video?: base = String(localized: "Grosses vidéos (≥ \(threshold))")
+            }
         case .category(let key):
             base = categories.first { $0.key == key }?.name ?? String(localized: "Catégorie")
         }

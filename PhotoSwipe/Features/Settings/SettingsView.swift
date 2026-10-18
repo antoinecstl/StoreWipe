@@ -51,6 +51,14 @@ struct SettingsView: View {
                         .onChange(of: settings.includesVideos) {
                             Task { await environment.applyMediaSettings() }
                         }
+                    Picker("Seuil des gros fichiers", selection: $settings.largeFileThresholdMB) {
+                        ForEach([10, 50, 100, 250, 500, 1000], id: \.self) { value in
+                            Text(DisplayFormat.thresholdLabel(megabytes: value)).tag(value)
+                        }
+                    }
+                    .onChange(of: settings.largeFileThresholdMB) {
+                        Task { await environment.applyMediaSettings() }
+                    }
                     Picker("Ordre du tri", selection: $settings.sortOrder) {
                         Text("Plus anciennes d'abord").tag(PresentationOrder.oldestFirst)
                         Text("Plus récentes d'abord").tag(PresentationOrder.newestFirst)

@@ -78,20 +78,18 @@ struct LargePileTests {
         #expect(await drain(photos) == ["p1", "p3", "p5"])
     }
 
-    @Test func skippedFilesReturnLaterInTheSamePile() async throws {
+    @Test func skippedFilesReturnInALaterSession() async throws {
         let store = try await indexedStore(assets)
         let scope = SessionScope(filter: .large(megabytes: 50, kind: nil))
-        let model = try await open(scope, store: store, clock: TestClock())
+        let clock = TestClock()
+        let model = try await open(scope, store: store, clock: clock)
         model.perform(.skip)
         await model.flush()
-        var presented: [AssetID] = []
-        while let current = model.current {
-            presented.append(current.id)
-            model.perform(.keep)
-            await model.flush()
-        }
-        // « p2 » passée revient en dernier, après les fichiers jamais examinés.
-        #expect(presented == ["p1", "p3", "p5", "p2"])
+        // Dans la session en cours, la photo passée n'est pas reproposée.
+        #expect(await drain(model) == ["p1", "p3", "p5"])
+        // Dans la session suivante, elle revient.
+        let next = try await open(scope, store: store, clock: clock)
+        #expect(next.current?.id == "p2")
     }
 
     @Test func overviewSummarisesWhatIsLeftToSort() async throws {

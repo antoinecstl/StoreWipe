@@ -13,6 +13,7 @@ final class AppSettings {
         case analysisEnabled
         case includesVideos
         case allowsNetworkForDuplicates
+        case largeFileThresholdMB
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -33,6 +34,11 @@ final class AppSettings {
     /// Désactivé par défaut : consommation de données.
     var allowsNetworkForDuplicates: Bool {
         didSet { defaults.set(allowsNetworkForDuplicates, forKey: key(.allowsNetworkForDuplicates)) }
+    }
+
+    /// Seuil, en Mo, à partir duquel un fichier est « gros » (pile et liste des gros fichiers).
+    var largeFileThresholdMB: Int {
+        didSet { defaults.set(largeFileThresholdMB, forKey: key(.largeFileThresholdMB)) }
     }
 
     /// Inclure les vidéos dans le tri, les compteurs et les analyses.
@@ -57,6 +63,7 @@ final class AppSettings {
         allowsNetworkForDisplay = defaults.object(forKey: keyPrefix + Key.allowsNetworkForDisplay.rawValue) as? Bool ?? true
         analysisEnabled = defaults.object(forKey: keyPrefix + Key.analysisEnabled.rawValue) as? Bool ?? false
         includesVideos = defaults.object(forKey: keyPrefix + Key.includesVideos.rawValue) as? Bool ?? true
+        largeFileThresholdMB = defaults.object(forKey: keyPrefix + Key.largeFileThresholdMB.rawValue) as? Int ?? 50
         allowsNetworkForDuplicates = defaults.object(forKey: keyPrefix + Key.allowsNetworkForDuplicates.rawValue) as? Bool ?? false
         sortOrder = defaults.string(forKey: keyPrefix + Key.sortOrder.rawValue).flatMap(PresentationOrder.init(rawValue:)) ?? .oldestFirst
     }
@@ -67,6 +74,7 @@ final class AppSettings {
         sortOrder = .oldestFirst
         analysisEnabled = false
         includesVideos = true
+        largeFileThresholdMB = 50
         allowsNetworkForDuplicates = false
         for key in Key.allCases {
             defaults.removeObject(forKey: self.key(key))

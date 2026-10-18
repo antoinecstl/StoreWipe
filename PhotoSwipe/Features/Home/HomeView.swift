@@ -13,8 +13,8 @@ enum Route: Hashable {
     case duplicates
 }
 
-/// Accueil épuré : une action principale avec la progression, la sélection en attente,
-/// les catégories reconnues sans analyse et quelques raccourcis.
+/// Accueil : une action principale avec la progression, la sélection à supprimer, les piles à swiper
+/// (gros fichiers, vidéos, captures, catégories), les outils pour libérer de la place et quelques raccourcis.
 struct HomeView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var path: [Route] = []
@@ -34,8 +34,9 @@ struct HomeView: View {
                 }
                 notices
                 deletionSection
+                pilesSection
                 freeUpSection
-                categoriesSection
+                intelligenceSection
                 Section("Trier autrement") {
                     NavigationLink(value: Route.months) {
                         Label("Trier par mois", systemImage: "calendar")
@@ -213,62 +214,45 @@ struct HomeView: View {
         }
     }
 
-    /// Raccourcis pour libérer de la place : fichiers les plus lourds et doublons probables.
-    @ViewBuilder
-    private var freeUpSection: some View {
-        Section {
-            NavigationLink(value: Route.largeFiles) {
-                Label("Gros fichiers", systemImage: "externaldrive")
-            }
-            NavigationLink(value: Route.duplicates) {
-                Label("Doublons", systemImage: "square.on.square")
-            }
-        } header: {
-            Text("Libérer de la place")
-        } footer: {
-            if environment.sizing.phase == .running {
-                Text("Mesure de la taille des fichiers en cours : \(environment.sizing.coverage.measured) sur \(environment.sizing.coverage.total).")
-            }
-        }
-    }
+    // MARK: - Piles à swiper
 
+    /// Piles à trier comme le tri principal : gros fichiers (du plus lourd au plus léger), vidéos,
+    /// captures d'écran et catégories reconnues.
     @ViewBuilder
-    private var categoriesSection: some View {
+    private var pilesSection: some View {
         Section {
-            if environment.settings.analysisEnabled {
-                analysisStatus
-            } else {
-                analysisIntro
-            }
-            if overview.screenshotsToSort > 0 {
-                NavigationLink(value: Route.sort(SessionScope(filter: .screenshots))) {
-                    CountRow(title: "Captures d'écran", systemImage: "camera.viewfinder", count: overview.screenshotsToSort)
+            largeFilesRow
+            if overview.videosToSort > 0 {
+                NavigationLink(value: Route.sort(SessionScope(filter: .videos))) {
+                    PileRow(title: "Vidéos", subtitle: nil, symbol: "video.fill", tint: .purple, count: overview.videosToSort)
                 }
                 .contextMenu {
-                    bulkButton(title: String(localized: "Captures d'écran"), filter: .screenshots, count: overview.screenshotsToSort)
+                    bulkButton(title: String(localized: "Vidéos"), filter: .videos, count: overview.videosToSort)
                 }
                 .swipeActions(edge: .trailing) {
-                    bulkButton(title: String(localized: "Captures d'écran"), filter: .screenshots, count: overview.screenshotsToSort)
+                    bulkButton(title: String(localized: "Vidéos"), filter: .videos, count: overview.videosToSort)
                         .tint(.red)
                 }
             }
-            if overview.videosToSort > 0 {
-                NavigationLink(value: Route.sort(SessionScope(filter: .videos))) {
-                    CountRow(title: "Vidéos", systemImage: "video", count: overview.videosToSort)
+            if overview.screenshotsToSort > 0 {
+                NavigationLink(value: Route.sort(SessionScope(filter: .screenshots))) {
+                    PileRow(title: "Captures d'écran", subtitle: nil, symbol: "camera.viewfinder", tint: .blue, count: overview.screenshotsToSort)
                 }
                 .contextMenu {
-                    bulkButton(title: String(localized: "Vidéos"), filter: .videos, count: overview.videosToSort)
+                    bulkButton(title: String(localized: "Captures d'écran"), filter: .screenshots, count: overview.screenshotsToSort)
                 }
                 .swipeActions(edge: .trailing) {
-                    bulkButton(title: String(localized: "Vidéos"), filter: .videos, count: overview.videosToSort)
+                    bulkButton(title: String(localized: "Captures d'écran"), filter: .screenshots, count: overview.screenshotsToSort)
                         .tint(.red)
                 }
             }
             ForEach(visibleCategories) { summary in
                 NavigationLink(value: Route.sort(SessionScope(filter: .category(summary.category.key)))) {
-                    CountRow(
+                    PileRow(
                         title: LocalizedStringKey(summary.category.name),
-                        systemImage: summary.category.symbol,
+                        subtitle: nil,
+                        symbol: summary.category.symbol,
+                        tint: .teal,
                         count: summary.toSort
                     )
                 }
@@ -289,15 +273,108 @@ struct HomeView: View {
                     }
                 }
             }
+        } header: {
+            Text("Piles à trier")
+        } footer: {
+            Text("Chaque pile se swipe comme le tri principal. Appui long ou glissement sur une pile pour tout marquer « à supprimer » : vous revoyez la sélection avant toute suppression.")
+        }
+    }
+
+    /// Gros fichiers : une pile comme les autres, du plus lourd au plus léger.
+    @ViewBuilder
+    private var largeFilesRow: some View {
+        let threshold = overview.largeThresholdMegabytes
+        let summary = overview.largeToSort
+        if summary.count > 0 {
+            let filter = SessionScope.Filter.large(megabytes: threshold, kind: nil)
+            NavigationLink(value: Route.sort(SessionScope(filter: filter))) {
+                PileRow(
+                    title: "Gros fichiers",
+                    subtitle: Text("≥ \(DisplayFormat.thresholdLabel(megabytes: threshold)) · \(DisplayFormat.byteCount(summary.bytes)) · du plus lourd au plus léger"),
+                    symbol: "externaldrive.fill",
+                    tint: .orange,
+                    count: summary.count
+                )
+            }
+            .contextMenu {
+                Button {
+                    path.append(.largeFiles)
+                } label: {
+                    Label("Voir la liste et sélectionner", systemImage: "list.bullet")
+                }
+                Menu {
+                    ForEach([10, 50, 100, 250, 500, 1000], id: \.self) { value in
+                        Button(DisplayFormat.thresholdLabel(megabytes: value)) {
+                            environment.settings.largeFileThresholdMB = value
+                            Task { await environment.applyMediaSettings() }
+                        }
+                    }
+                } label: {
+                    Label("Seuil : \(DisplayFormat.thresholdLabel(megabytes: threshold))", systemImage: "slider.horizontal.3")
+                }
+                bulkButton(title: String(localized: "Gros fichiers"), filter: filter, count: summary.count)
+            }
+            .swipeActions(edge: .trailing) {
+                bulkButton(title: String(localized: "Gros fichiers"), filter: filter, count: summary.count)
+                    .tint(.red)
+            }
+            .swipeActions(edge: .leading) {
+                Button {
+                    path.append(.largeFiles)
+                } label: {
+                    Label("Liste", systemImage: "list.bullet")
+                }
+                .tint(.orange)
+            }
+        } else if environment.sizing.phase == .running {
+            PileRow(
+                title: "Gros fichiers",
+                subtitle: Text("Mesure de la taille des fichiers : \(environment.sizing.coverage.measured) sur \(environment.sizing.coverage.total)"),
+                symbol: "externaldrive.fill",
+                tint: .orange,
+                count: nil
+            )
+        }
+    }
+
+    // MARK: - Libérer de la place
+
+    /// Outils qui ne se swipent pas : groupes de doublons et liste des gros fichiers.
+    @ViewBuilder
+    private var freeUpSection: some View {
+        Section {
+            NavigationLink(value: Route.duplicates) {
+                Label("Doublons", systemImage: "square.on.square")
+            }
+            NavigationLink(value: Route.largeFiles) {
+                Label("Gros fichiers : liste et sélection groupée", systemImage: "list.bullet")
+            }
+        } header: {
+            Text("Libérer de la place")
+        } footer: {
+            if environment.sizing.phase == .running {
+                Text("Mesure de la taille des fichiers en cours : \(environment.sizing.coverage.measured) sur \(environment.sizing.coverage.total).")
+            }
+        }
+    }
+
+    // MARK: - Reconnaissance intelligente
+
+    @ViewBuilder
+    private var intelligenceSection: some View {
+        Section {
             if environment.settings.analysisEnabled {
+                analysisStatus
                 NavigationLink(value: Route.newCategory) {
                     Label("Créer une catégorie", systemImage: "plus.circle")
                 }
+            } else {
+                analysisIntro
             }
         } header: {
-            Text("Tri intelligent")
+            Text("Reconnaissance intelligente")
         } footer: {
-            Text("Tout est analysé sur cet iPhone, rien n'est envoyé. Appui long ou glissement sur une catégorie pour tout marquer « à supprimer » : vous revoyez et confirmez ensuite la sélection.")
+            Text("Tout est analysé sur cet iPhone, rien n'est envoyé.")
         }
     }
 
@@ -478,6 +555,45 @@ struct BulkTarget: Identifiable {
     let filter: SessionScope.Filter
     let count: Int
     var id: String { title }
+}
+
+/// Ligne d'une pile à swiper : pastille colorée, titre, détail éventuel et effectif.
+struct PileRow: View {
+    let title: LocalizedStringKey
+    let subtitle: Text?
+    let symbol: String
+    let tint: Color
+    let count: Int?
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 36, height: 36)
+                .background(tint.gradient, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+                if let subtitle {
+                    subtitle
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 8)
+            if let count {
+                Text(count, format: .number)
+                    .font(.body.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            } else {
+                ProgressView()
+            }
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+    }
 }
 
 struct CountRow: View {

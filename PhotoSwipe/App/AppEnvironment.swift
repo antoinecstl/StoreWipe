@@ -54,6 +54,7 @@ final class AppEnvironment {
         self.isDemoMode = isDemoMode
         self.sync = LibrarySyncCoordinator(library: library, store: store, enumerationOrder: { [settings] in settings.sortOrder })
         self.overview = LibraryOverviewModel(store: store)
+        self.overview.largeThresholdMegabytes = settings.largeFileThresholdMB
         self.sizing = SizeScanCoordinator(store: store, sizer: sizer)
         self.duplicateScan = DuplicateScanCoordinator(
             store: store,
@@ -237,6 +238,7 @@ final class AppEnvironment {
     /// Applique le réglage « inclure les vidéos » aux compteurs, piles et analyses.
     func applyMediaSettings() async {
         await store.setIncludesVideos(settings.includesVideos)
+        overview.largeThresholdMegabytes = settings.largeFileThresholdMB
         await overview.refresh()
         await overview.refreshMonths()
         await analysis.refreshProgress()
