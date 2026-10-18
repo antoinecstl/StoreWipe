@@ -14,7 +14,7 @@ public final class AnalysisCoordinator {
     public enum Phase: Sendable, Equatable {
         case idle
         case running
-        /// Suspendue (économie d'énergie, appareil trop chaud) : reprend d'elle-même.
+        /// Suspendue (appareil dans un état critique) : reprend d'elle-même.
         case paused
         case finished
     }
@@ -25,12 +25,14 @@ public final class AnalysisCoordinator {
     public private(set) var revision = 0
     /// Photos ignorées pendant cette passe (image absente de l'appareil ou illisible).
     public private(set) var skippedCount = 0
+    /// Vrai quand l'analyse tourne à cadence réduite (iPhone chaud, économie d'énergie) au lieu de s'arrêter.
+    public private(set) var isThrottled = false
 
     public static let batchSize = 12
 
     private let store: PhotoSwipeStore
     private let analyzer: any ImageAnalyzing
-    private let shouldPause: @MainActor () -> Bool
+    private let pacing: @MainActor () -> WorkPacing
     private let pauseInterval: Duration
     private let now: @Sendable () -> Date
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -39,13 +41,13 @@ public final class AnalysisCoordinator {
     public init(
         store: PhotoSwipeStore,
         analyzer: any ImageAnalyzing,
-        shouldPause: @escaping @MainActor () -> Bool = { false },
+        pacing: @escaping @MainActor () -> WorkPacing = { .full },
         pauseInterval: Duration = .seconds(5),
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.store = store
         self.analyzer = analyzer
-        self.shouldPause = shouldPause
+        self.pacing = pacing
         self.pauseInterval = pauseInterval
         self.now = now
     }
@@ -58,7 +60,8 @@ public final class AnalysisCoordinator {
         runID += 1
         let id = runID
         phase = .running
-        task = Task { [weak self] in
+        // Priorité basse : cœurs économes, moins de chaleur, l'interface reste fluide.
+        task = Task(priority: .utility) { [weak self] in
             await self?.run()
             self?.finishRun(id)
         }
@@ -68,6 +71,7 @@ public final class AnalysisCoordinator {
         runID += 1
         task?.cancel()
         task = nil
+        isThrottled = false
         if phase != .finished { phase = .idle }
     }
 
@@ -93,7 +97,8 @@ public final class AnalysisCoordinator {
         skippedCount = 0
         await refreshProgress()
         while !Task.isCancelled {
-            if shouldPause() {
+            if case .paused = pacing() {
+                isThrottled = false
                 phase = .paused
                 try? await Task.sleep(for: pauseInterval)
                 continue
@@ -106,7 +111,17 @@ public final class AnalysisCoordinator {
             if batch.isEmpty { break }
             for asset in batch {
                 if Task.isCancelled { return }
-                if shouldPause() { break }
+                switch pacing() {
+                case .paused:
+                    isThrottled = false
+                case .throttled(let delay):
+                    // Espacer les photos laisse l'appareil refroidir sans interrompre le travail.
+                    isThrottled = true
+                    try? await Task.sleep(for: delay)
+                case .full:
+                    isThrottled = false
+                }
+                if case .paused = pacing() { break }
                 do {
                     if let analysis = try await analyzer.analyze(asset.id) {
                         try await store.saveAnalysis(analysis, for: asset, at: now())
@@ -128,6 +143,7 @@ public final class AnalysisCoordinator {
         guard !Task.isCancelled else { return }
         await refreshProgress()
         revision += 1
+        isThrottled = false
         phase = .finished
     }
 }

@@ -64,13 +64,18 @@ public struct DuplicateMember: Sendable, Hashable, Identifiable {
     public var id: AssetID { asset.id }
 }
 
-/// Photos ou vidéos qui ont mêmes dimensions, même date de création à la seconde et même taille
-/// en octets. C'est un indice fort mais pas une preuve : une comparaison d'empreintes est prévue.
+/// Groupe de doublons.
+///
+/// - `isExact == false` (probables) : mêmes dimensions, même date de création à la seconde et même taille.
+///   Un indice fort, pas une preuve.
+/// - `isExact == true` : octets identiques, prouvés par une empreinte SHA-256 complète.
 public struct DuplicateGroup: Sendable, Hashable, Identifiable {
     public let members: [DuplicateMember]
+    public let isExact: Bool
 
-    public init(members: [DuplicateMember]) {
+    public init(members: [DuplicateMember], isExact: Bool = false) {
         self.members = members
+        self.isExact = isExact
     }
 
     public var id: AssetID { suggestedKeeper }

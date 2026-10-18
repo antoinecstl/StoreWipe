@@ -197,6 +197,7 @@ public actor PhotoSwipeStore {
 
     func purgeRows(for id: AssetID) throws {
         let argument: [SQLValue] = [.text(id.rawValue)]
+        try connection.run("DELETE FROM resource_digests WHERE local_id = ?;", argument)
         try connection.run("DELETE FROM analysis_labels WHERE local_id = ?;", argument)
         try connection.run("DELETE FROM analyses WHERE local_id = ?;", argument)
         try connection.run("DELETE FROM decision_events WHERE local_id = ?;", argument)
@@ -659,6 +660,7 @@ public actor PhotoSwipeStore {
             try connection.execute("DELETE FROM decision_events;")
             try connection.execute("DELETE FROM decisions;")
             try connection.execute("DELETE FROM sessions;")
+            try connection.execute("DELETE FROM resource_digests;")
             try connection.execute("DELETE FROM analysis_labels;")
             try connection.execute("DELETE FROM analyses;")
             try connection.execute("DELETE FROM categories;")

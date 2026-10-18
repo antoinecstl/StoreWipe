@@ -68,7 +68,7 @@ struct AnalysisCoordinatorTests {
         let coordinator = AnalysisCoordinator(
             store: store,
             analyzer: FakeAnalyzer { _ in labeled("cat") },
-            shouldPause: { flag.isPaused },
+            pacing: { flag.isPaused ? .paused : .full },
             pauseInterval: .milliseconds(5)
         )
         coordinator.start()

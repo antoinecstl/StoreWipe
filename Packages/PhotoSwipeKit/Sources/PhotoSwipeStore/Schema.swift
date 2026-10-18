@@ -109,6 +109,22 @@ enum Schema {
             "ALTER TABLE assets ADD COLUMN byte_size INTEGER;",
             "CREATE INDEX assets_by_size ON assets(byte_size DESC);",
         ]),
+        Migration(version: 4, statements: [
+            // Empreintes des fichiers d'origine pour les doublons exacts (voir docs/06). Aucune image conservée.
+            """
+            CREATE TABLE resource_digests (
+                local_id TEXT PRIMARY KEY NOT NULL,
+                method TEXT NOT NULL,
+                fingerprint TEXT NOT NULL,
+                eligible INTEGER NOT NULL,
+                partial TEXT,
+                full TEXT,
+                computed_at REAL NOT NULL
+            ) WITHOUT ROWID;
+            """,
+            "CREATE INDEX resource_digests_by_hash ON resource_digests(full, partial);",
+            "CREATE INDEX assets_duplicate_key ON assets(byte_size, pixel_width, pixel_height, media_type);",
+        ]),
     ]
 
     static var latestVersion: Int { migrations.map(\.version).max() ?? 0 }

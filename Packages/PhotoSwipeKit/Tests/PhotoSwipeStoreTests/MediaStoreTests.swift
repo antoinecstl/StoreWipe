@@ -43,6 +43,9 @@ struct MediaStoreTests {
         _ = try await store.upsertAssets([media("a", day: 1)], generation: generation, calendar: utcCalendar)
         let connection = try SQLiteConnection(location: .file(url))
         // Retour à un schéma v2 : colonnes supprimées puis version abaissée.
+        try connection.execute("DROP INDEX assets_duplicate_key;")
+        try connection.execute("DROP INDEX resource_digests_by_hash;")
+        try connection.execute("DROP TABLE resource_digests;")
         try connection.execute("DROP INDEX assets_by_size;")
         try connection.execute("ALTER TABLE assets DROP COLUMN media_type;")
         try connection.execute("ALTER TABLE assets DROP COLUMN duration;")
