@@ -41,6 +41,7 @@ struct SortingSessionView: View {
                 )
             } else {
                 SessionHeader(item: model.current, stats: model.stats, remaining: model.remainingCount)
+                CategoryReasonBanner(itemID: model.current?.id, scope: model.scope)
                 cardStack
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onGeometryChange(for: CGSize.self) { proxy in

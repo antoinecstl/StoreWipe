@@ -9,6 +9,9 @@ public struct CategoryRule: Sendable, Hashable {
     public var minLabelConfidence: Double
     /// Images jugées « utilitaires » par le système.
     public var includesUtility: Bool
+    /// Pour les images utilitaires : couverture de texte minimale (une image utilitaire sans texte n'est
+    /// pas un document). `nil` : aucune exigence.
+    public var utilityMinTextCoverage: Double?
     /// Seuil de couverture de texte (documents, reçus, notes).
     public var minTextCoverage: Double?
     /// Seuil d'esthétique : photos dont le score est inférieur ou égal.
@@ -20,6 +23,7 @@ public struct CategoryRule: Sendable, Hashable {
         labels: Set<String> = [],
         minLabelConfidence: Double = 0.5,
         includesUtility: Bool = false,
+        utilityMinTextCoverage: Double? = nil,
         minTextCoverage: Double? = nil,
         maxAesthetics: Double? = nil,
         excludesScreenshots: Bool = false,
@@ -28,6 +32,7 @@ public struct CategoryRule: Sendable, Hashable {
         self.labels = labels
         self.minLabelConfidence = minLabelConfidence
         self.includesUtility = includesUtility
+        self.utilityMinTextCoverage = utilityMinTextCoverage
         self.minTextCoverage = minTextCoverage
         self.maxAesthetics = maxAesthetics
         self.excludesScreenshots = excludesScreenshots
@@ -41,6 +46,35 @@ public struct CategoryRule: Sendable, Hashable {
 
     public var hasPositiveCondition: Bool {
         !labels.isEmpty || includesUtility || minTextCoverage != nil || maxAesthetics != nil
+    }
+}
+
+/// Raison pour laquelle une photo correspond à une catégorie (affichée à l'utilisateur).
+public enum MatchReason: Sendable, Hashable {
+    case utility
+    case textCoverage(Double)
+    case label(String, Double)
+    case lowAesthetics(Double)
+}
+
+extension CategoryRule {
+    /// Conditions de la règle remplies par cette analyse (vide : la photo n'y correspond pas par analyse).
+    public func reasons(for analysis: ImageAnalysis) -> [MatchReason] {
+        var result: [MatchReason] = []
+        for label in analysis.labels.sorted(by: { $0.confidence > $1.confidence })
+        where labels.contains(label.name) && label.confidence >= minLabelConfidence {
+            result.append(.label(label.name, label.confidence))
+        }
+        if includesUtility, analysis.isUtility, analysis.textCoverage >= (utilityMinTextCoverage ?? 0) {
+            result.append(.utility)
+        }
+        if let minTextCoverage, analysis.textCoverage >= minTextCoverage {
+            result.append(.textCoverage(analysis.textCoverage))
+        }
+        if let maxAesthetics, analysis.aestheticsScore <= maxAesthetics {
+            result.append(.lowAesthetics(analysis.aestheticsScore))
+        }
+        return result
     }
 }
 
@@ -82,7 +116,8 @@ public enum BuiltInCategories {
         symbol: "doc.text",
         rule: CategoryRule(
             includesUtility: true,
-            minTextCoverage: 0.25,
+            utilityMinTextCoverage: 0.04,
+            minTextCoverage: 0.3,
             excludesScreenshots: true
         )
     )

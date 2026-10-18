@@ -180,3 +180,56 @@ struct MediaStoreTests {
         #expect(group.reclaimableBytes == 10)
     }
 }
+
+@Suite("Raisons d'appartenance à une catégorie")
+struct CategoryReasonTests {
+    private func analysis(
+        labels: [ImageLabel] = [],
+        coverage: Double = 0,
+        utility: Bool = false,
+        aesthetics: Double = 0.3
+    ) -> ImageAnalysis {
+        ImageAnalysis(labels: labels, textCoverage: coverage, textCharacterCount: 0, isUtility: utility, aestheticsScore: aesthetics)
+    }
+
+    @Test func documentsNeedTextForUtilityImages() {
+        let rule = BuiltInCategories.documents.rule
+        #expect(rule.reasons(for: analysis(coverage: 0.1, utility: true)) == [.utility])
+        #expect(rule.reasons(for: analysis(coverage: 0, utility: true)).isEmpty)
+        #expect(rule.reasons(for: analysis(coverage: 0.5)) == [.textCoverage(0.5)])
+        #expect(rule.reasons(for: analysis(coverage: 0.5, utility: true)) == [.utility, .textCoverage(0.5)])
+    }
+
+    @Test func labelReasonsAreOrderedByConfidenceAndFiltered() {
+        let rule = CategoryRule.custom(labels: ["cat", "dog"])
+        let found = analysis(labels: [
+            ImageLabel(name: "dog", confidence: 0.6), ImageLabel(name: "cat", confidence: 0.9),
+            ImageLabel(name: "tree", confidence: 0.99), ImageLabel(name: "cat2", confidence: 0.4),
+        ])
+        #expect(rule.reasons(for: found) == [.label("cat", 0.9), .label("dog", 0.6)])
+    }
+
+    @Test func lowQualityReason() {
+        let rule = BuiltInCategories.lowQuality.rule
+        #expect(rule.reasons(for: analysis(aesthetics: -0.5)) == [.lowAesthetics(-0.5)])
+        #expect(rule.reasons(for: analysis(aesthetics: 0.2)).isEmpty)
+    }
+
+    @Test func storedAnalysisCanBeReadBack() async throws {
+        let store = try PhotoSwipeStore(url: nil)
+        let generation = try await store.beginSyncGeneration()
+        _ = try await store.upsertAssets([media("a", day: 1)], generation: generation, calendar: utcCalendar)
+        let asset = try #require(try await store.asset("a"))
+        #expect(try await store.analysis(for: "a") == nil)
+        let saved = analysis(
+            labels: [ImageLabel(name: "cat", confidence: 0.9), ImageLabel(name: "animal", confidence: 0.7)],
+            coverage: 0.2, utility: true, aesthetics: -0.1
+        )
+        try await store.saveAnalysis(saved, for: asset, at: Date())
+        let read = try #require(try await store.analysis(for: "a"))
+        #expect(read.labels.map(\.name) == ["cat", "animal"])
+        #expect(read.isUtility)
+        #expect(read.textCoverage == 0.2)
+        #expect(read.aestheticsScore == -0.1)
+    }
+}

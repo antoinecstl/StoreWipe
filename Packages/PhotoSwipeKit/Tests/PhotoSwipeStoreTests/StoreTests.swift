@@ -543,10 +543,12 @@ struct AnalysisStoreTests {
     @Test func builtInDocumentsAndLowQualityRules() async throws {
         let store = try await indexed([
             photo("receipt", day: 1), photo("scan", day: 2), photo("blurry", day: 3),
-            photo("nice", day: 4), screenshot("shot", day: 5),
+            photo("nice", day: 4), screenshot("shot", day: 5), photo("object", day: 6),
         ])
         let assets = Dictionary(uniqueKeysWithValues: try await store.assetsToAnalyze(limit: 10).map { ($0.id, $0) })
-        try await store.saveAnalysis(analysis(utility: true, aesthetics: -0.8), for: assets["receipt"]!, at: Date())
+        try await store.saveAnalysis(analysis(coverage: 0.1, utility: true, aesthetics: -0.8), for: assets["receipt"]!, at: Date())
+        // Jugée utilitaire mais sans texte : un objet, pas un document.
+        try await store.saveAnalysis(analysis(coverage: 0, utility: true, aesthetics: 0.1), for: assets["object"]!, at: Date())
         try await store.saveAnalysis(analysis(coverage: 0.4), for: assets["scan"]!, at: Date())
         try await store.saveAnalysis(analysis(aesthetics: -0.6), for: assets["blurry"]!, at: Date())
         try await store.saveAnalysis(analysis(aesthetics: 0.7), for: assets["nice"]!, at: Date())

@@ -66,6 +66,26 @@ extension PhotoSwipeStore {
         }
     }
 
+    /// Résultat d'analyse enregistré pour une photo (pour expliquer pourquoi elle est proposée).
+    public func analysis(for id: AssetID) throws -> ImageAnalysis? {
+        let measures = try connection.query(
+            "SELECT text_coverage, text_chars, is_utility, aesthetics FROM analyses WHERE local_id = ?;",
+            [.text(id.rawValue)]
+        ) { row in (row.double(0), row.int(1), row.int(2) != 0, row.double(3)) }
+        guard let measure = measures.first else { return nil }
+        let labels = try connection.query(
+            "SELECT label, confidence FROM analysis_labels WHERE local_id = ? ORDER BY confidence DESC;",
+            [.text(id.rawValue)]
+        ) { ImageLabel(name: $0.text(0), confidence: $0.double(1)) }
+        return ImageAnalysis(
+            labels: labels,
+            textCoverage: measure.0,
+            textCharacterCount: measure.1,
+            isUtility: measure.2,
+            aestheticsScore: measure.3
+        )
+    }
+
     public func analysisProgress() throws -> AnalysisProgress {
         try connection.query(
             """
@@ -165,7 +185,12 @@ extension PhotoSwipeStore {
             arguments += labels.map { .text($0) }
         }
         if rule.includesUtility {
-            positives.append("EXISTS (SELECT 1 FROM analyses x WHERE x.local_id = a.local_id AND x.is_utility = 1)")
+            var utility = "EXISTS (SELECT 1 FROM analyses x WHERE x.local_id = a.local_id AND x.is_utility = 1"
+            if let coverage = rule.utilityMinTextCoverage {
+                utility += " AND x.text_coverage >= ?"
+                arguments.append(.real(coverage))
+            }
+            positives.append(utility + ")")
         }
         if let coverage = rule.minTextCoverage {
             positives.append("EXISTS (SELECT 1 FROM analyses x WHERE x.local_id = a.local_id AND x.text_coverage >= ?)")
