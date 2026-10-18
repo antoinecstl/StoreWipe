@@ -546,7 +546,7 @@ struct AnalysisStoreTests {
         try await store.saveAnalysis(analysis(coverage: 0.4), for: assets["scan"]!, at: Date())
         try await store.saveAnalysis(analysis(aesthetics: -0.6), for: assets["blurry"]!, at: Date())
         try await store.saveAnalysis(analysis(aesthetics: 0.7), for: assets["nice"]!, at: Date())
-        try await store.saveAnalysis(analysis(utility: true, coverage: 0.5), for: assets["shot"]!, at: Date())
+        try await store.saveAnalysis(analysis(coverage: 0.5, utility: true), for: assets["shot"]!, at: Date())
 
         func ids(_ category: PhotoCategory) async throws -> Set<AssetID> {
             let session = try await store.startSession(scope: SessionScope(filter: .category(category.key)), at: Date())
