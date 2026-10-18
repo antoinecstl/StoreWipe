@@ -50,10 +50,10 @@ Légende : ✅ fait et testé (tests du paquet, Linux et macOS) · 🟡 impléme
 | ID | Élément | Critères d'acceptation |
 |----|---------|------------------------|
 | D-01 | Pile « Captures d'écran » | Métadonnées uniquement ; disponible immédiatement après indexation | ✅ logique · 🟡 UI |
-| D-02 | Migration v2 `resource_digests` | Migration testée depuis v1 |
-| D-03 | Doublons exacts | Conforme à la [spécification](06-doublons-exacts.md) ; tests HEIC/JPEG, retouche, Live Photo, iCloud | 🟡 **doublons probables** livrés (mêmes dimensions, seconde et taille) ; empreinte SHA-256 à faire pour parler de doublons « exacts » |
+| D-02 | Migration `resource_digests` (v4) | Migration testée depuis v3 | ✅ |
+| D-03 | Doublons exacts | Conforme à la [spécification](06-doublons-exacts.md) ; tests HEIC/JPEG, retouche, Live Photo, iCloud | ✅ logique (migration v4, `DuplicateScanCoordinator`) · 🟡 PhotoKit : doublons exacts par SHA-256 ; doublons probables en complément |
 | D-04 | Groupes de doublons | Exemplaire conservé suggéré avec règle visible ; impossible de tout supprimer | 🟡 règle affichée, un exemplaire toujours conservé ; albums d'appartenance non affichés |
-| D-05 | Réglage iCloud doublons | Désactivé par défaut ; statut « non vérifiable » |
+| D-05 | Réglage iCloud doublons | Désactivé par défaut ; statut « non vérifiable » | ✅ logique · 🟡 UI |
 
 ## Incrément E — Classifieur local
 

@@ -1,6 +1,6 @@
 # Spécification — doublons exacts (incrément D)
 
-Statut : **spécifiée ; seule la détection de doublons *probables* (dimensions, seconde de création, taille) est implémentée, sans empreinte.** Cette définition est fixée avant le développement, conformément au principe 7.
+Statut : **implémentée (`exact-sha256-v1`), à valider sur appareil.** Empreinte partielle de 64 Kio puis complète, uniquement entre fichiers de même (nature, dimensions, taille) ; éligibilité par nombre de ressources (une seule ressource photo ou vidéo) ; iCloud seulement si le réglage dédié est activé. Non fait : nombre d'albums d'appartenance, concurrence de 2 lectures (une seule lecture à la fois), type UTI dans le regroupement. Les *doublons probables* (dimensions, seconde de création, taille, sans lecture) restent proposés pour les fichiers non vérifiés. Cette définition est fixée avant le développement, conformément au principe 7.
 
 ## 1. Définition V1 (stricte)
 

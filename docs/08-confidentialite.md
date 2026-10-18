@@ -35,3 +35,7 @@ Aucune photo de la photothèque n'est modifiée ou supprimée par cette action.
 ## 4. Analyse locale des photos (réglage facultatif)
 
 Quand l'utilisateur active « Reconnaître mes photos », chaque photo est lue en version réduite par les API Vision du système, sur l'appareil. Sont enregistrés dans la base locale : des étiquettes de contenu avec leur confiance, un indicateur « utilitaire », un score d'esthétique, la part de surface couverte par du texte et le nombre de caractères reconnus. **Le texte reconnu, les images et leurs miniatures ne sont jamais conservés ni journalisés.** Aucun réseau n'est utilisé (une photo uniquement présente dans iCloud est ignorée). « Effacer les données de l'application » supprime ces résultats et les catégories créées par l'utilisateur ; désactiver l'analyse l'arrête sans effacer les résultats.
+
+## 5. Vérification des doublons (à la demande)
+
+Quand l'utilisateur lance « Vérifier les doublons exacts », l'app lit, sur l'appareil, les octets de fichiers de même taille pour en calculer une empreinte SHA-256. **Seules les empreintes sont enregistrées** (aucun contenu, aucune miniature). Aucun téléchargement iCloud n'a lieu, sauf si l'utilisateur active le réglage « Télécharger pour vérifier les doublons ». Les empreintes sont supprimées avec « Effacer les données de l'application » et lorsqu'une photo disparaît de la photothèque.
