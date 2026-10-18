@@ -1,7 +1,7 @@
 import Foundation
 
 /// Sens de présentation des photos datées.
-public enum SortOrder: String, Sendable, Hashable, CaseIterable {
+public enum PresentationOrder: String, Sendable, Hashable, CaseIterable {
     case newestFirst
     case oldestFirst
 }
@@ -15,6 +15,8 @@ public struct SessionScope: Sendable, Hashable {
         case undated
         /// Captures d'écran, d'après les métadonnées système (aucune analyse d'image).
         case screenshots
+        /// Catégorie d'après l'analyse locale (clé de `PhotoCategory`).
+        case category(String)
     }
 
     public enum Pool: String, Sendable, Hashable, CaseIterable {
@@ -28,9 +30,9 @@ public struct SessionScope: Sendable, Hashable {
 
     public var filter: Filter
     public var pool: Pool
-    public var order: SortOrder
+    public var order: PresentationOrder
 
-    public init(filter: Filter, pool: Pool = .standard, order: SortOrder = .newestFirst) {
+    public init(filter: Filter, pool: Pool = .standard, order: PresentationOrder = .newestFirst) {
         self.filter = filter
         self.pool = pool
         self.order = order
@@ -68,6 +70,7 @@ public struct SessionScope: Sendable, Hashable {
         case .month(let month): filterValue = "month:\(month.rawValue)"
         case .undated: filterValue = "undated"
         case .screenshots: filterValue = "screenshots"
+        case .category(let key): filterValue = "category:\(key)"
         }
         // Le sens n'est écrit que s'il diffère de l'ancien comportement : les sessions existantes restent lisibles.
         let orderSuffix = order == .oldestFirst ? "|oldest" : ""
@@ -77,7 +80,7 @@ public struct SessionScope: Sendable, Hashable {
     public init?(storageValue: String) {
         let parts = storageValue.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
         guard (2...3).contains(parts.count), let pool = Pool(rawValue: parts[0]) else { return nil }
-        let order: SortOrder
+        let order: PresentationOrder
         if parts.count == 3 {
             guard parts[2] == "oldest" else { return nil }
             order = .oldestFirst
@@ -92,6 +95,8 @@ public struct SessionScope: Sendable, Hashable {
             filter = .undated
         case "screenshots":
             filter = .screenshots
+        case let value where value.hasPrefix("category:") && value.count > "category:".count:
+            filter = .category(String(value.dropFirst("category:".count)))
         case let value where value.hasPrefix("month:"):
             guard let raw = Int(value.dropFirst("month:".count)), let month = MonthKey(rawValue: raw) else { return nil }
             filter = .month(month)

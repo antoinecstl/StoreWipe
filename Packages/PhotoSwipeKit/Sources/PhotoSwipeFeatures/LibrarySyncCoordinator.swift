@@ -31,7 +31,7 @@ public final class LibrarySyncCoordinator {
     private let store: PhotoSwipeStore
     private let calendar: Calendar
     private let now: @Sendable () -> Date
-    private let enumerationOrder: @MainActor () -> SortOrder
+    private let enumerationOrder: @MainActor () -> PresentationOrder
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var rerunRequested = false
     @ObservationIgnored private var observationTask: Task<Void, Never>?
@@ -42,7 +42,7 @@ public final class LibrarySyncCoordinator {
         store: PhotoSwipeStore,
         calendar: Calendar = .current,
         now: @escaping @Sendable () -> Date = { Date() },
-        enumerationOrder: @escaping @MainActor () -> SortOrder = { .newestFirst }
+        enumerationOrder: @escaping @MainActor () -> PresentationOrder = { .newestFirst }
     ) {
         self.library = library
         self.store = store

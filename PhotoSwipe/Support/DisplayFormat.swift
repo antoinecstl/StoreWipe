@@ -22,7 +22,7 @@ enum DisplayFormat {
         date.formatted(date: .abbreviated, time: .omitted)
     }
 
-    static func scopeTitle(_ scope: SessionScope) -> String {
+    static func scopeTitle(_ scope: SessionScope, categories: [PhotoCategory] = []) -> String {
         let base: String
         switch scope.filter {
         case .all:
@@ -37,6 +37,8 @@ enum DisplayFormat {
             base = String(localized: "Sans date")
         case .screenshots:
             base = String(localized: "Captures d'écran")
+        case .category(let key):
+            base = categories.first { $0.key == key }?.name ?? String(localized: "Catégorie")
         }
         switch scope.pool {
         case .standard: return base

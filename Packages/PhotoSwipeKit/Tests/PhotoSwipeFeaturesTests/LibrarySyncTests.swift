@@ -19,7 +19,7 @@ final class AuthorizationFlippingLibrary: PhotoLibraryService {
     func existingAssetIDs(among ids: [AssetID]) async -> Set<AssetID> { await base.existingAssetIDs(among: ids) }
     func changeNotifications() -> AsyncStream<Void> { base.changeNotifications() }
 
-    func assetBatches(batchSize: Int, order: SortOrder) -> AsyncThrowingStream<[AssetSummary], any Error> {
+    func assetBatches(batchSize: Int, order: PresentationOrder) -> AsyncThrowingStream<[AssetSummary], any Error> {
         let stream = base.assetBatches(batchSize: batchSize, order: order)
         base.setAuthorization(after, notify: false)
         return stream

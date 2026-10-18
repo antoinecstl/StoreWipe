@@ -48,8 +48,8 @@ struct SettingsView: View {
 
                 Section {
                     Picker("Ordre du tri", selection: $settings.sortOrder) {
-                        Text("Plus anciennes d'abord").tag(SortOrder.oldestFirst)
-                        Text("Plus récentes d'abord").tag(SortOrder.newestFirst)
+                        Text("Plus anciennes d'abord").tag(PresentationOrder.oldestFirst)
+                        Text("Plus récentes d'abord").tag(PresentationOrder.newestFirst)
                     }
                 } header: {
                     Text("Tri")

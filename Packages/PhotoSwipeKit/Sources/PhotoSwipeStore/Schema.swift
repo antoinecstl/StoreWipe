@@ -70,6 +70,38 @@ enum Schema {
             """,
             "CREATE TABLE meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL) WITHOUT ROWID;",
         ]),
+        Migration(version: 2, statements: [
+            // Analyse locale : mesures et étiquettes uniquement, jamais de pixel ni de texte reconnu.
+            """
+            CREATE TABLE analyses (
+                local_id TEXT PRIMARY KEY NOT NULL,
+                fingerprint TEXT NOT NULL,
+                analyzed_at REAL NOT NULL,
+                text_coverage REAL NOT NULL,
+                text_chars INTEGER NOT NULL,
+                is_utility INTEGER NOT NULL,
+                aesthetics REAL NOT NULL
+            ) WITHOUT ROWID;
+            """,
+            """
+            CREATE TABLE analysis_labels (
+                local_id TEXT NOT NULL,
+                label TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                PRIMARY KEY (local_id, label)
+            ) WITHOUT ROWID;
+            """,
+            "CREATE INDEX analysis_labels_by_label ON analysis_labels(label, confidence);",
+            // Catégories créées par l'utilisateur : nom et étiquettes (une par ligne).
+            """
+            CREATE TABLE categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                labels TEXT NOT NULL,
+                created_at REAL NOT NULL
+            );
+            """,
+        ]),
     ]
 
     static var latestVersion: Int { migrations.map(\.version).max() ?? 0 }

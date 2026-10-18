@@ -444,3 +444,167 @@ struct ScreenshotAndPurgeTests {
         #expect(try await store.assetCount() == 3)
     }
 }
+
+// MARK: - Analyses et catégories
+
+func analysis(
+    _ labels: [String: Double] = [:],
+    coverage: Double = 0,
+    utility: Bool = false,
+    aesthetics: Double = 0.3
+) -> ImageAnalysis {
+    ImageAnalysis(
+        labels: labels.map { ImageLabel(name: $0.key, confidence: $0.value) },
+        textCoverage: coverage,
+        textCharacterCount: Int(coverage * 1000),
+        isUtility: utility,
+        aestheticsScore: aesthetics
+    )
+}
+
+@Suite("Store – analyses et catégories")
+struct AnalysisStoreTests {
+    private func indexed(_ assets: [AssetSummary]) async throws -> PhotoSwipeStore {
+        let store = try PhotoSwipeStore(url: nil)
+        let generation = try await store.beginSyncGeneration()
+        _ = try await store.upsertAssets(assets, generation: generation, calendar: utcCalendar)
+        return store
+    }
+
+    private func screenshot(_ id: String, day: Int) -> AssetSummary {
+        AssetSummary(
+            id: AssetID(id),
+            creationDate: Date(timeIntervalSince1970: 1_704_110_400 + Double(day) * 86_400),
+            pixelWidth: 1170,
+            pixelHeight: 2532,
+            subtypes: [.screenshot]
+        )
+    }
+
+    @Test func migratesFromVersionOne() async throws {
+        let url = temporaryDatabaseURL()
+        _ = try makeFileStore(at: url)
+        let connection = try SQLiteConnection(location: .file(url))
+        try connection.execute("DROP TABLE analysis_labels;")
+        try connection.execute("DROP TABLE analyses;")
+        try connection.execute("DROP TABLE categories;")
+        try connection.execute("PRAGMA user_version = 1;")
+        let store = try PhotoSwipeStore(url: url)
+        #expect(try await store.analysisProgress() == AnalysisProgress())
+        #expect(try await store.customCategories().isEmpty)
+        #expect(PhotoSwipeStore.schemaVersion >= 2)
+    }
+
+    @Test func tracksProgressAndReanalysesModifiedPhotos() async throws {
+        let store = try await indexed([photo("a", day: 1), photo("b", day: 2)])
+        #expect(try await store.analysisProgress() == AnalysisProgress(total: 2, analyzed: 0))
+        let pending = try await store.assetsToAnalyze(limit: 10)
+        #expect(Set(pending.map(\.id)) == ["a", "b"])
+        try await store.saveAnalysis(analysis(["cat": 0.9]), for: pending[0], at: Date())
+        #expect(try await store.analysisProgress() == AnalysisProgress(total: 2, analyzed: 1))
+        #expect(try await store.assetsToAnalyze(limit: 10, excluding: [pending[1].id]).isEmpty)
+
+        // La photo est retouchée : son empreinte change, elle redevient à analyser.
+        let generation = try await store.beginSyncGeneration()
+        _ = try await store.upsertAssets([photo(pending[0].id.rawValue, day: 1, modified: 1_800_000_000)], generation: generation, calendar: utcCalendar)
+        #expect(try await store.analysisProgress().analyzed == 0)
+    }
+
+    @Test func customCategoryMatchesByLabelAndConfidence() async throws {
+        let store = try await indexed([photo("a", day: 1), photo("b", day: 2), photo("c", day: 3)])
+        let assets = try await store.assetsToAnalyze(limit: 10)
+        let byID = Dictionary(uniqueKeysWithValues: assets.map { ($0.id, $0) })
+        try await store.saveAnalysis(analysis(["cat": 0.9, "animal": 0.8]), for: byID["a"]!, at: Date())
+        try await store.saveAnalysis(analysis(["dog": 0.7]), for: byID["b"]!, at: Date())
+        try await store.saveAnalysis(analysis(["cat": 0.2]), for: byID["c"]!, at: Date())
+
+        let pets = try await store.addCategory(name: "Animaux", labels: ["cat", "dog"], at: Date())
+        #expect(pets.customID != nil)
+        #expect(try await store.matchCount(rule: pets.rule) == 2)
+        #expect(try await store.toSortCount(filter: .category(pets.key)) == 2)
+
+        let session = try await store.startSession(scope: SessionScope(filter: .category(pets.key)), at: Date())
+        let page = try await store.queuePage(QueueRequest(filter: .category(pets.key), phase: .main, sessionID: session.id, limit: 10))
+        #expect(Set(page.map(\.id)) == ["a", "b"])
+        #expect(try await store.remainingCount(for: session) == 2)
+
+        let stats = try await store.labelStatistics()
+        #expect(stats.first { $0.label == "cat" }?.count == 1)
+
+        try await store.deleteCategory(id: pets.customID!)
+        #expect(try await store.customCategories().isEmpty)
+        #expect(try await store.toSortCount(filter: .category(pets.key)) == 0)
+    }
+
+    @Test func builtInDocumentsAndLowQualityRules() async throws {
+        let store = try await indexed([
+            photo("receipt", day: 1), photo("scan", day: 2), photo("blurry", day: 3),
+            photo("nice", day: 4), screenshot("shot", day: 5),
+        ])
+        let assets = Dictionary(uniqueKeysWithValues: try await store.assetsToAnalyze(limit: 10).map { ($0.id, $0) })
+        try await store.saveAnalysis(analysis(utility: true, aesthetics: -0.8), for: assets["receipt"]!, at: Date())
+        try await store.saveAnalysis(analysis(coverage: 0.4), for: assets["scan"]!, at: Date())
+        try await store.saveAnalysis(analysis(aesthetics: -0.6), for: assets["blurry"]!, at: Date())
+        try await store.saveAnalysis(analysis(aesthetics: 0.7), for: assets["nice"]!, at: Date())
+        try await store.saveAnalysis(analysis(utility: true, coverage: 0.5), for: assets["shot"]!, at: Date())
+
+        func ids(_ category: PhotoCategory) async throws -> Set<AssetID> {
+            let session = try await store.startSession(scope: SessionScope(filter: .category(category.key)), at: Date())
+            let page = try await store.queuePage(QueueRequest(filter: .category(category.key), phase: .main, sessionID: session.id, limit: 20))
+            return Set(page.map(\.id))
+        }
+        // Les captures d'écran ont leur propre pile ; une image utilitaire n'est pas « peu réussie ».
+        #expect(try await ids(BuiltInCategories.documents) == ["receipt", "scan"])
+        #expect(try await ids(BuiltInCategories.lowQuality) == ["blurry"])
+    }
+
+    @Test func unanalysedPhotosBelongToNoCategory() async throws {
+        let store = try await indexed([photo("a", day: 1)])
+        #expect(try await store.toSortCount(filter: .category(BuiltInCategories.documents.key)) == 0)
+        #expect(try await store.toSortCount(filter: .category("custom:999")) == 0)
+        #expect(try await store.category(forKey: "nonsense") == nil)
+    }
+
+    @Test func purgeAndEraseRemoveAnalyses() async throws {
+        let store = try await indexed([photo("a", day: 1), photo("b", day: 2)])
+        for asset in try await store.assetsToAnalyze(limit: 10) {
+            try await store.saveAnalysis(analysis(["cat": 0.9]), for: asset, at: Date())
+        }
+        try await store.purge(["a"])
+        #expect(try await store.analysisProgress() == AnalysisProgress(total: 1, analyzed: 1))
+        #expect(try await store.labelStatistics().first?.count == 1)
+        try await store.addCategory(name: "X", labels: ["cat"], at: Date())
+        try await store.eraseAll()
+        #expect(try await store.labelStatistics().isEmpty)
+        #expect(try await store.customCategories().isEmpty)
+    }
+
+    @Test func markAllToSortIsJournaledAndSkipsHandledPhotos() async throws {
+        let store = try await indexed([screenshot("s1", day: 1), screenshot("s2", day: 2), screenshot("s3", day: 3), photo("p", day: 4)])
+        try await store.applyDecision(.kept, to: "s1", sessionID: nil, at: Date())
+        try await store.applyDecision(.deferred, to: "s3", sessionID: nil, at: Date())
+        let count = try await store.markAllToSort(filter: .screenshots, as: .markedForDeletion, at: Date())
+        #expect(count == 2)
+        #expect(try await store.decision(for: "s1")?.decision == .kept)
+        #expect(try await store.decision(for: "s2")?.decision == .markedForDeletion)
+        #expect(try await store.decision(for: "s3")?.decision == .markedForDeletion)
+        #expect(try await store.decision(for: "p") == nil)
+        #expect(Set(try await store.markedForDeletion().map(\.id)) == ["s2", "s3"])
+        // Rien de plus à marquer.
+        #expect(try await store.markAllToSort(filter: .screenshots, as: .markedForDeletion, at: Date()) == 0)
+    }
+}
+
+@Suite("Recherche d'étiquettes")
+struct LabelSearchTests {
+    @Test func matchesEnglishAndFrenchWords() {
+        #expect(LabelSearch.matches(label: "cat", query: "cat"))
+        #expect(LabelSearch.matches(label: "cat", query: "Chat"))
+        #expect(LabelSearch.matches(label: "beach", query: "plage"))
+        #expect(LabelSearch.matches(label: "hot_dog", query: "hot dog"))
+        #expect(LabelSearch.matches(label: "receipt", query: "reçu"))
+        #expect(!LabelSearch.matches(label: "dog", query: "chat"))
+        #expect(LabelSearch.matches(label: "anything", query: "  "))
+        #expect(LabelSearch.displayName("hot_dog") == "hot dog")
+    }
+}

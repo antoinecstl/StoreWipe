@@ -47,7 +47,7 @@ public final class InMemoryPhotoLibrary: PhotoLibraryService {
         }
     }
 
-    public func assetBatches(batchSize: Int, order: SortOrder) -> AsyncThrowingStream<[AssetSummary], any Error> {
+    public func assetBatches(batchSize: Int, order: PresentationOrder) -> AsyncThrowingStream<[AssetSummary], any Error> {
         let snapshot: [AssetSummary] = state.withLock { state in
             state.enumerationCount += 1
             let visible = Self.visibleAssets(in: state)

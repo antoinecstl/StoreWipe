@@ -14,10 +14,23 @@ public final class LibraryOverviewModel {
         public let stats: SessionStats
     }
 
+    /// Une catégorie et ses effectifs d'après l'analyse locale.
+    public struct CategorySummary: Sendable, Hashable, Identifiable {
+        public let category: PhotoCategory
+        /// Photos de la catégorie encore à trier (non examinées ou passées).
+        public let toSort: Int
+        /// Photos de la catégorie, quel que soit leur état.
+        public let total: Int
+
+        public var id: String { category.key }
+    }
+
     public private(set) var counts: DecisionCounts = .zero
     public private(set) var months: [MonthSummary] = []
     /// Captures d'écran restant à trier (métadonnées système, sans analyse d'image).
     public private(set) var screenshotsToSort = 0
+    public private(set) var categories: [CategorySummary] = []
+    public private(set) var analysisProgress = AnalysisProgress()
     public private(set) var resumable: ResumableSession?
     public private(set) var hasLoaded = false
     public private(set) var loadFailed = false
@@ -35,6 +48,8 @@ public final class LibraryOverviewModel {
         do {
             counts = try await store.decisionCounts()
             screenshotsToSort = try await store.toSortCount(filter: .screenshots)
+            analysisProgress = try await store.analysisProgress()
+            categories = try await loadCategories()
             resumable = try await loadResumable()
             hasLoaded = true
             loadFailed = false
@@ -49,6 +64,20 @@ public final class LibraryOverviewModel {
         } catch {
             loadFailed = true
         }
+    }
+
+    private func loadCategories() async throws -> [CategorySummary] {
+        var summaries: [CategorySummary] = []
+        for category in try await store.allCategories() {
+            summaries.append(
+                CategorySummary(
+                    category: category,
+                    toSort: try await store.toSortCount(filter: .category(category.key)),
+                    total: try await store.matchCount(rule: category.rule)
+                )
+            )
+        }
+        return summaries
     }
 
     /// Une session n'est proposée à la reprise que si elle a commencé et qu'il lui reste des photos.

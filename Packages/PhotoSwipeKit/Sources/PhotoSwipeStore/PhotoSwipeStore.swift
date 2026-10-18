@@ -13,7 +13,7 @@ public struct QueueRequest: Sendable, Hashable {
     public var cursorInclusive: Bool
     public var excluding: [AssetID]
     public var limit: Int
-    public var order: SortOrder
+    public var order: PresentationOrder
 
     public init(
         filter: SessionScope.Filter,
@@ -23,7 +23,7 @@ public struct QueueRequest: Sendable, Hashable {
         cursorInclusive: Bool = true,
         excluding: [AssetID] = [],
         limit: Int,
-        order: SortOrder = .newestFirst
+        order: PresentationOrder = .newestFirst
     ) {
         self.filter = filter
         self.phase = phase
@@ -59,7 +59,7 @@ public enum AssetVisibility: Int, Sendable {
 /// Toutes les écritures de décision sont validées immédiatement dans une transaction :
 /// une fermeture forcée de l'app ne perd aucune décision déjà affichée comme prise.
 public actor PhotoSwipeStore {
-    private let connection: SQLiteConnection
+    let connection: SQLiteConnection
 
     /// - Parameter url: fichier de base ; `nil` pour une base en mémoire (tests, mode dégradé).
     public init(url: URL?) throws {
@@ -178,8 +178,10 @@ public actor PhotoSwipeStore {
         }
     }
 
-    private func purgeRows(for id: AssetID) throws {
+    func purgeRows(for id: AssetID) throws {
         let argument: [SQLValue] = [.text(id.rawValue)]
+        try connection.run("DELETE FROM analysis_labels WHERE local_id = ?;", argument)
+        try connection.run("DELETE FROM analyses WHERE local_id = ?;", argument)
         try connection.run("DELETE FROM decision_events WHERE local_id = ?;", argument)
         try connection.run("DELETE FROM decisions WHERE local_id = ?;", argument)
         try connection.run("DELETE FROM assets WHERE local_id = ?;", argument)
@@ -311,7 +313,7 @@ public actor PhotoSwipeStore {
         }
     }
 
-    private func currentDecisionRow(for id: AssetID) throws -> (decision: Decision, decidedAt: Date?) {
+    func currentDecisionRow(for id: AssetID) throws -> (decision: Decision, decidedAt: Date?) {
         try connection.query(
             "SELECT decision, decided_at FROM decisions WHERE local_id = ?;",
             [.text(id.rawValue)]
@@ -320,7 +322,7 @@ public actor PhotoSwipeStore {
         }.first ?? (.unreviewed, nil)
     }
 
-    private func writeDecision(_ decision: Decision, decidedAt: Date, sessionID: SessionID?, for id: AssetID) throws {
+    func writeDecision(_ decision: Decision, decidedAt: Date, sessionID: SessionID?, for id: AssetID) throws {
         if decision == .unreviewed {
             try connection.run("DELETE FROM decisions WHERE local_id = ?;", [.text(id.rawValue)])
             return
@@ -382,7 +384,7 @@ public actor PhotoSwipeStore {
     public func toSortCount(filter: SessionScope.Filter) throws -> Int {
         var clauses = ["a.visibility = 0", "(d.decision IS NULL OR d.decision = 3)"]
         var arguments: [SQLValue] = []
-        appendFilter(filter, to: &clauses, arguments: &arguments)
+        try appendFilter(filter, to: &clauses, arguments: &arguments)
         return Int(try connection.scalarInt(
             """
             SELECT COUNT(*) FROM assets a LEFT JOIN decisions d ON d.local_id = a.local_id
@@ -516,7 +518,7 @@ public actor PhotoSwipeStore {
     public func queuePage(_ request: QueueRequest) throws -> [QueueItem] {
         var clauses = ["a.visibility = 0"]
         var arguments: [SQLValue] = []
-        appendFilter(request.filter, to: &clauses, arguments: &arguments)
+        try appendFilter(request.filter, to: &clauses, arguments: &arguments)
         appendPhase(request.phase, sessionID: request.sessionID, to: &clauses, arguments: &arguments)
         let ascending = request.order == .oldestFirst
         if request.phase != .deferred, let cursor = request.cursor {
@@ -556,7 +558,7 @@ public actor PhotoSwipeStore {
         for phase in session.scope.phases {
             var clauses = ["a.visibility = 0"]
             var arguments: [SQLValue] = []
-            appendFilter(session.scope.filter, to: &clauses, arguments: &arguments)
+            try appendFilter(session.scope.filter, to: &clauses, arguments: &arguments)
             appendPhase(phase, sessionID: session.id, to: &clauses, arguments: &arguments)
             if phase == .kept, let cursor = session.cursor {
                 let comparison = Self.afterCursorOperators(ascending: session.scope.order == .oldestFirst, inclusive: true)
@@ -578,7 +580,7 @@ public actor PhotoSwipeStore {
         return (strict, inclusive ? strict + "=" : strict)
     }
 
-    private func appendFilter(_ filter: SessionScope.Filter, to clauses: inout [String], arguments: inout [SQLValue]) {
+    func appendFilter(_ filter: SessionScope.Filter, to clauses: inout [String], arguments: inout [SQLValue]) throws {
         switch filter {
         case .all:
             break
@@ -589,6 +591,11 @@ public actor PhotoSwipeStore {
             clauses.append("a.month_key IS NULL")
         case .screenshots:
             clauses.append("(a.subtypes & \(AssetSubtypes.screenshot.rawValue)) != 0")
+        case .category(let key):
+            let rule = try category(forKey: key)?.rule
+            let condition = rule.map(Self.condition(for:)) ?? ("0", [])
+            clauses.append(condition.sql)
+            arguments += condition.arguments
         }
     }
 
@@ -633,6 +640,9 @@ public actor PhotoSwipeStore {
             try connection.execute("DELETE FROM decision_events;")
             try connection.execute("DELETE FROM decisions;")
             try connection.execute("DELETE FROM sessions;")
+            try connection.execute("DELETE FROM analysis_labels;")
+            try connection.execute("DELETE FROM analyses;")
+            try connection.execute("DELETE FROM categories;")
             try connection.execute("DELETE FROM assets;")
             try connection.execute("DELETE FROM meta;")
             try connection.execute("DELETE FROM sqlite_sequence;")
@@ -643,16 +653,16 @@ public actor PhotoSwipeStore {
 
     // MARK: - Décodage
 
-    private static let assetColumns =
+    static let assetColumns =
         "a.local_id, a.creation_date, a.modification_date, a.pixel_width, a.pixel_height, a.subtypes, a.burst_id, a.is_favorite"
 
     private static let sessionColumns = "id, scope, started_at, ended_at, cursor_sort_date, cursor_local_id"
 
-    private static func decodeAsset(_ row: SQLiteRow) throws -> AssetSummary {
+    static func decodeAsset(_ row: SQLiteRow) throws -> AssetSummary {
         try decodeAsset(row, offset: 0)
     }
 
-    private static func decodeAsset(_ row: SQLiteRow, offset: Int32) throws -> AssetSummary {
+    static func decodeAsset(_ row: SQLiteRow, offset: Int32) throws -> AssetSummary {
         AssetSummary(
             id: AssetID(row.text(offset)),
             creationDate: row.optionalDate(offset + 1),

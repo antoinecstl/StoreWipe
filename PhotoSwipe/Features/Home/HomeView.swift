@@ -8,6 +8,7 @@ enum Route: Hashable {
     case sort(SessionScope)
     case resume
     case deletion
+    case newCategory
 }
 
 /// Accueil épuré : une action principale avec la progression, la sélection en attente,
@@ -16,6 +17,7 @@ struct HomeView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var path: [Route] = []
     @State private var isShowingSettings = false
+    @State private var pendingBulk: BulkTarget?
 
     private var overview: LibraryOverviewModel { environment.overview }
     private var counts: DecisionCounts { overview.counts }
@@ -73,6 +75,23 @@ struct HomeView: View {
                 try? await Task.sleep(for: .milliseconds(300))
                 guard !Task.isCancelled else { return }
                 await overview.refresh()
+                environment.resumeAnalysisIfNeeded()
+            }
+            .task(id: environment.analysis.revision) {
+                await overview.refresh()
+            }
+            .confirmationDialog(
+                "Marquer \(pendingBulk?.count ?? 0) photos ?",
+                isPresented: Binding(get: { pendingBulk != nil }, set: { if !$0 { pendingBulk = nil } }),
+                titleVisibility: .visible,
+                presenting: pendingBulk
+            ) { target in
+                Button("Tout marquer à supprimer", role: .destructive) {
+                    Task { await environment.markAllForDeletion(filter: target.filter) }
+                }
+                Button("Annuler", role: .cancel) {}
+            } message: { target in
+                Text("« \(target.title) » : \(target.count) photos iront dans la sélection à supprimer. Rien n'est supprimé : vous reverrez la sélection et pourrez en retirer avant de confirmer.")
             }
             .onChange(of: path) { _, newPath in
                 if newPath.isEmpty {
@@ -96,7 +115,7 @@ struct HomeView: View {
         if let resumable = overview.resumable {
             PrimaryActionCard(
                 title: "Reprendre le tri",
-                subtitle: Text(DisplayFormat.scopeTitle(resumable.record.scope)) + Text(verbatim: " · ") + Text("\(resumable.remaining) restantes"),
+                subtitle: Text(DisplayFormat.scopeTitle(resumable.record.scope, categories: overview.categories.map(\.category))) + Text(verbatim: " · ") + Text("\(resumable.remaining) restantes"),
                 systemImage: "play.fill",
                 style: .prominent
             ) {
@@ -193,17 +212,139 @@ struct HomeView: View {
 
     @ViewBuilder
     private var categoriesSection: some View {
-        if overview.screenshotsToSort > 0 {
-            Section {
+        Section {
+            if environment.settings.analysisEnabled {
+                analysisStatus
+            } else {
+                analysisIntro
+            }
+            if overview.screenshotsToSort > 0 {
                 NavigationLink(value: Route.sort(SessionScope(filter: .screenshots))) {
                     CountRow(title: "Captures d'écran", systemImage: "camera.viewfinder", count: overview.screenshotsToSort)
                 }
-            } header: {
-                Text("Par catégorie")
-            } footer: {
-                Text("Détectées par iOS, sans analyse de vos images. D'autres catégories (documents, reçus…) arriveront plus tard.")
+                .contextMenu {
+                    bulkButton(title: String(localized: "Captures d'écran"), filter: .screenshots, count: overview.screenshotsToSort)
+                }
+                .swipeActions(edge: .trailing) {
+                    bulkButton(title: String(localized: "Captures d'écran"), filter: .screenshots, count: overview.screenshotsToSort)
+                        .tint(.red)
+                }
             }
+            ForEach(visibleCategories) { summary in
+                NavigationLink(value: Route.sort(SessionScope(filter: .category(summary.category.key)))) {
+                    CountRow(
+                        title: LocalizedStringKey(summary.category.name),
+                        systemImage: summary.category.symbol,
+                        count: summary.toSort
+                    )
+                }
+                .contextMenu {
+                    if summary.toSort > 0 {
+                        bulkButton(title: summary.category.name, filter: .category(summary.category.key), count: summary.toSort)
+                    }
+                    if !summary.category.isBuiltIn {
+                        Button("Supprimer cette catégorie", role: .destructive) {
+                            Task { await environment.deleteCategory(summary.category) }
+                        }
+                    }
+                }
+                .swipeActions(edge: .trailing) {
+                    if summary.toSort > 0 {
+                        bulkButton(title: summary.category.name, filter: .category(summary.category.key), count: summary.toSort)
+                            .tint(.red)
+                    }
+                }
+            }
+            if environment.settings.analysisEnabled {
+                NavigationLink(value: Route.newCategory) {
+                    Label("Créer une catégorie", systemImage: "plus.circle")
+                }
+            }
+        } header: {
+            Text("Tri intelligent")
+        } footer: {
+            Text("Tout est analysé sur cet iPhone, rien n'est envoyé. Appui long ou glissement sur une catégorie pour tout marquer « à supprimer » : vous revoyez et confirmez ensuite la sélection.")
         }
+    }
+
+    /// Catégories à afficher : celles qui ont des photos à trier, et toutes celles de l'utilisateur.
+    private var visibleCategories: [LibraryOverviewModel.CategorySummary] {
+        overview.categories.filter { $0.toSort > 0 || !$0.category.isBuiltIn }
+    }
+
+    private func bulkButton(title: String, filter: SessionScope.Filter, count: Int) -> some View {
+        Button {
+            pendingBulk = BulkTarget(title: title, filter: filter, count: count)
+        } label: {
+            Label("Tout marquer à supprimer", systemImage: "trash")
+        }
+    }
+
+    private var analysisIntro: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Reconnaître mes photos", systemImage: "sparkles")
+                .font(.headline)
+            Text("PhotoSwipe peut repérer sur votre iPhone les documents, reçus, photos peu réussies, ou ce que vous choisissez (animaux, repas…), et vous les proposer par pile.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button("Activer l'analyse") {
+                environment.setAnalysisEnabled(true)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var analysisStatus: some View {
+        let analysis = environment.analysis
+        let progress = analysis.progress
+        VStack(alignment: .leading, spacing: 8) {
+            switch analysis.phase {
+            case .running:
+                Label("Analyse en cours", systemImage: "wand.and.stars")
+                    .font(.subheadline.weight(.semibold))
+                ProgressView(value: progress.fraction)
+                Text("\(progress.analyzed) sur \(progress.total) photos")
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            case .paused:
+                Label("Analyse en pause", systemImage: "pause.circle")
+                    .font(.subheadline.weight(.semibold))
+                Text("Mode économie d'énergie ou iPhone chaud : elle reprendra d'elle-même.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            case .finished:
+                Label("Analyse terminée", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                Text("\(progress.analyzed) sur \(progress.total) photos analysées")
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                if analysis.skippedCount > 0 {
+                    Text("\(analysis.skippedCount) photos ignorées (uniquement dans iCloud ou illisibles).")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            case .idle:
+                Label("Analyse arrêtée", systemImage: "stop.circle")
+                    .font(.subheadline.weight(.semibold))
+                if progress.total > 0 {
+                    Text("\(progress.analyzed) sur \(progress.total) photos analysées")
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Button("Reprendre l'analyse") {
+                    environment.resumeAnalysisIfNeeded()
+                }
+                .font(.footnote)
+            }
+            Button("Désactiver l'analyse", role: .destructive) {
+                environment.setAnalysisEnabled(false)
+            }
+            .font(.footnote)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - Avertissements
@@ -282,8 +423,18 @@ struct HomeView: View {
             SortingScreen(source: .resume, onExit: { path.removeAll() }, onReviewSelection: { path = [.deletion] })
         case .deletion:
             DeletionReviewView()
+        case .newCategory:
+            CategoryEditorView()
         }
     }
+}
+
+/// Catégorie ou pile dont l'utilisateur veut tout marquer « à supprimer » (après confirmation).
+struct BulkTarget: Identifiable {
+    let title: String
+    let filter: SessionScope.Filter
+    let count: Int
+    var id: String { title }
 }
 
 struct CountRow: View {

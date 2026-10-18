@@ -22,6 +22,7 @@ final class AppEnvironment {
     let images: any AssetImageProviding
     let settings: AppSettings
     let sync: LibrarySyncCoordinator
+    let analysis: AnalysisCoordinator
     let overview: LibraryOverviewModel
     let storageIssue: StorageIssue?
     let isDemoMode: Bool
@@ -34,6 +35,7 @@ final class AppEnvironment {
         store: PhotoSwipeStore,
         library: any PhotoLibraryService,
         deleter: any AssetDeleting,
+        analyzer: any ImageAnalyzing,
         images: any AssetImageProviding,
         settings: AppSettings,
         storageIssue: StorageIssue?,
@@ -48,6 +50,10 @@ final class AppEnvironment {
         self.isDemoMode = isDemoMode
         self.sync = LibrarySyncCoordinator(library: library, store: store, enumerationOrder: { [settings] in settings.sortOrder })
         self.overview = LibraryOverviewModel(store: store)
+        self.analysis = AnalysisCoordinator(store: store, analyzer: analyzer, shouldPause: {
+            let info = ProcessInfo.processInfo
+            return info.isLowPowerModeEnabled || info.thermalState == .serious || info.thermalState == .critical
+        })
         self.authorization = library.authorizationStatus()
     }
 
@@ -67,6 +73,7 @@ final class AppEnvironment {
             store: store,
             library: library,
             deleter: library,
+            analyzer: VisionImageAnalyzer(),
             images: PhotoKitImageProvider(),
             settings: AppSettings(defaults: .standard),
             storageIssue: issue,
@@ -98,6 +105,7 @@ final class AppEnvironment {
             store: store,
             library: library,
             deleter: library,
+            analyzer: DemoImageAnalyzer(),
             images: DemoImageProvider(),
             settings: AppSettings(defaults: .standard, keyPrefix: "demo."),
             storageIssue: issue,
@@ -128,6 +136,7 @@ final class AppEnvironment {
         authorization = library.authorizationStatus()
         guard authorization.allowsReading, settings.hasCompletedOnboarding else { return }
         sync.startObservingChanges()
+        resumeAnalysisIfNeeded()
         let isStale = sync.lastCompletedAt.map { Date().timeIntervalSince($0) > Self.foregroundResyncInterval } ?? true
         if previous != authorization || isStale {
             sync.requestSync()
@@ -183,6 +192,38 @@ final class AppEnvironment {
         try await SessionLauncher.resumeActive(store: store)
     }
 
+    // MARK: - Analyse et catégories
+
+    /// Relance l'analyse si elle est activée (au retour au premier plan, après de nouvelles photos).
+    func resumeAnalysisIfNeeded() {
+        guard settings.analysisEnabled, authorization.allowsReading, !analysis.isActive else { return }
+        analysis.start()
+    }
+
+    func setAnalysisEnabled(_ enabled: Bool) {
+        settings.analysisEnabled = enabled
+        if enabled {
+            resumeAnalysisIfNeeded()
+        } else {
+            analysis.stop()
+        }
+    }
+
+    /// Marque toutes les photos encore à trier d'un filtre comme « à supprimer ». Rien n'est supprimé :
+    /// la sélection reste à revoir et à confirmer.
+    @discardableResult
+    func markAllForDeletion(filter: SessionScope.Filter) async -> Int {
+        let count = (try? await store.markAllToSort(filter: filter, as: .markedForDeletion, at: Date())) ?? 0
+        await overview.refresh()
+        return count
+    }
+
+    func deleteCategory(_ category: PhotoCategory) async {
+        guard let id = category.customID else { return }
+        try? await store.deleteCategory(id: id)
+        await overview.refresh()
+    }
+
     // MARK: - Suppression
 
     func makeDeletionReview() -> DeletionReviewModel {
@@ -200,6 +241,7 @@ final class AppEnvironment {
     /// Efface index, décisions, sessions, caches et réglages. Ne touche à aucune photo.
     func eraseAllData() async throws {
         sync.stop()
+        analysis.stop()
         await sync.waitUntilIdle()
         try await store.eraseAll()
         images.reset()

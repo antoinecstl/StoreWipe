@@ -24,7 +24,7 @@ public protocol PhotoLibraryService: Sendable {
     func requestAuthorization() async -> LibraryAuthorization
 
     /// Énumère les photos accessibles (hors vidéos et photos masquées) par lots, dans le sens demandé.
-    func assetBatches(batchSize: Int, order: SortOrder) -> AsyncThrowingStream<[AssetSummary], any Error>
+    func assetBatches(batchSize: Int, order: PresentationOrder) -> AsyncThrowingStream<[AssetSummary], any Error>
 
     /// Parmi `ids`, ceux qui existent encore et sont visibles avec l'autorisation actuelle,
     /// y compris les photos masquées. En accès limité, une photo non autorisée est
