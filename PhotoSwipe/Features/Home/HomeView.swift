@@ -7,9 +7,11 @@ enum Route: Hashable {
     case months
     case sort(SessionScope)
     case resume
+    case deletion
 }
 
-/// Accueil épuré : une action principale, quelques raccourcis, la sélection en attente.
+/// Accueil épuré : une action principale avec la progression, la sélection en attente,
+/// les catégories reconnues sans analyse et quelques raccourcis.
 struct HomeView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var path: [Route] = []
@@ -27,6 +29,8 @@ struct HomeView: View {
                         .listRowBackground(Color.clear)
                 }
                 notices
+                deletionSection
+                categoriesSection
                 Section("Trier autrement") {
                     NavigationLink(value: Route.months) {
                         Label("Trier par mois", systemImage: "calendar")
@@ -41,13 +45,6 @@ struct HomeView: View {
                             CountRow(title: "Revoir les photos conservées", systemImage: "checkmark.circle", count: counts.kept)
                         }
                     }
-                }
-                Section {
-                    CountRow(title: "Photos à supprimer", systemImage: "trash", count: counts.markedForDeletion)
-                } header: {
-                    Text("Sélection à supprimer")
-                } footer: {
-                    Text("Aucune photo n'est supprimée tant que vous n'avez pas confirmé cette sélection.")
                 }
                 syncStatus
             }
@@ -85,6 +82,13 @@ struct HomeView: View {
         }
     }
 
+    /// Part des photos déjà tranchées (conservées ou à supprimer). Les photos passées restent à trier.
+    private var sortedFraction: Double? {
+        guard counts.totalAccessible > 0 else { return nil }
+        let sorted = counts.totalAccessible - overview.remainingToSort
+        return Double(sorted) / Double(counts.totalAccessible)
+    }
+
     // MARK: - Action principale
 
     @ViewBuilder
@@ -102,10 +106,11 @@ struct HomeView: View {
             PrimaryActionCard(title: "Chargement…", subtitle: nil, systemImage: "hourglass", style: .informational, action: nil)
         } else if overview.remainingToSort > 0 {
             PrimaryActionCard(
-                title: "Commencer le tri",
+                title: counts.unreviewed == counts.totalAccessible ? "Commencer le tri" : "Continuer le tri",
                 subtitle: Text("\(overview.remainingToSort) photos à trier"),
                 systemImage: "play.fill",
-                style: .prominent
+                style: .prominent,
+                progress: sortedFraction
             ) {
                 path.append(.sort(.everything))
             }
@@ -143,6 +148,61 @@ struct HomeView: View {
                 style: .informational,
                 action: nil
             )
+        }
+    }
+
+    // MARK: - Sélection et catégories
+
+    @ViewBuilder
+    private var deletionSection: some View {
+        Section {
+            if counts.markedForDeletion > 0 {
+                NavigationLink(value: Route.deletion) {
+                    HStack(spacing: 14) {
+                        Image(systemName: "trash.fill")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background(Color.red.gradient, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(counts.markedForDeletion) photos à supprimer")
+                                .font(.headline)
+                            Text("Revoir la sélection, puis supprimer")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            } else {
+                Label {
+                    Text("Aucune photo en attente de suppression.")
+                        .foregroundStyle(.secondary)
+                } icon: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Suppression")
+        } footer: {
+            Text("Un swipe ne supprime rien. Vous confirmez ici, puis iOS demande une dernière validation. Les photos restent récupérables 30 jours dans « Supprimés récemment ».")
+        }
+    }
+
+    @ViewBuilder
+    private var categoriesSection: some View {
+        if overview.screenshotsToSort > 0 {
+            Section {
+                NavigationLink(value: Route.sort(SessionScope(filter: .screenshots))) {
+                    CountRow(title: "Captures d'écran", systemImage: "camera.viewfinder", count: overview.screenshotsToSort)
+                }
+            } header: {
+                Text("Par catégorie")
+            } footer: {
+                Text("Détectées par iOS, sans analyse de vos images. D'autres catégories (documents, reçus…) arriveront plus tard.")
+            }
         }
     }
 
@@ -217,9 +277,11 @@ struct HomeView: View {
         case .months:
             MonthListView { path.append($0) }
         case .sort(let scope):
-            SortingScreen(source: .scope(scope)) { path.removeAll() }
+            SortingScreen(source: .scope(scope), onExit: { path.removeAll() }, onReviewSelection: { path = [.deletion] })
         case .resume:
-            SortingScreen(source: .resume) { path.removeAll() }
+            SortingScreen(source: .resume, onExit: { path.removeAll() }, onReviewSelection: { path = [.deletion] })
+        case .deletion:
+            DeletionReviewView()
         }
     }
 }
@@ -249,6 +311,7 @@ struct PrimaryActionCard: View {
     let subtitle: Text?
     let systemImage: String
     let style: Style
+    var progress: Double?
     let action: (() -> Void)?
 
     var body: some View {
@@ -266,13 +329,20 @@ struct PrimaryActionCard: View {
                 .font(.title2)
                 .frame(width: 40)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.title3.bold())
                 if let subtitle {
                     subtitle
                         .font(.subheadline)
                         .opacity(0.9)
+                }
+                if let progress, style == .prominent {
+                    ProgressView(value: min(max(progress, 0), 1))
+                        .tint(.white)
+                        .padding(.top, 2)
+                        .accessibilityLabel(Text("Progression du tri"))
+                        .accessibilityValue(Text(progress, format: .percent.precision(.fractionLength(0))))
                 }
             }
             Spacer(minLength: 0)
@@ -287,7 +357,7 @@ struct PrimaryActionCard: View {
         .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(style == .prominent ? Color.accentColor : Color(.secondarySystemGroupedBackground))
+                .fill(style == .prominent ? AnyShapeStyle(Color.accentColor.gradient) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
         )
         .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .accessibilityElement(children: .combine)

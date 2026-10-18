@@ -182,6 +182,17 @@ public actor PhotoSwipeStore {
         try connection.run("DELETE FROM assets WHERE local_id = ?;", argument)
     }
 
+    /// Retire de l'index local des photos réellement supprimées de la photothèque,
+    /// avec leurs décisions et leur journal. Ne touche à aucune photo.
+    public func purge(_ ids: [AssetID]) throws {
+        guard !ids.isEmpty else { return }
+        try connection.transaction {
+            for id in ids {
+                try purgeRows(for: id)
+            }
+        }
+    }
+
     public func assetCount(visibility: AssetVisibility? = nil) throws -> Int {
         if let visibility {
             return Int(try connection.scalarInt("SELECT COUNT(*) FROM assets WHERE visibility = ?;", [.int(visibility.rawValue)]) ?? 0)
@@ -362,6 +373,20 @@ public actor PhotoSwipeStore {
                 deferred: row.int(4)
             )
         }.first ?? .zero
+    }
+
+    /// Photos restant à trier (non examinées ou passées) pour un filtre donné.
+    public func toSortCount(filter: SessionScope.Filter) throws -> Int {
+        var clauses = ["a.visibility = 0", "(d.decision IS NULL OR d.decision = 3)"]
+        var arguments: [SQLValue] = []
+        appendFilter(filter, to: &clauses, arguments: &arguments)
+        return Int(try connection.scalarInt(
+            """
+            SELECT COUNT(*) FROM assets a LEFT JOIN decisions d ON d.local_id = a.local_id
+            WHERE \(clauses.joined(separator: " AND "));
+            """,
+            arguments
+        ) ?? 0)
     }
 
     public func monthSummaries() throws -> [MonthSummary] {
@@ -551,6 +576,8 @@ public actor PhotoSwipeStore {
             arguments.append(.int(month.rawValue))
         case .undated:
             clauses.append("a.month_key IS NULL")
+        case .screenshots:
+            clauses.append("(a.subtypes & \(AssetSubtypes.screenshot.rawValue)) != 0")
         }
     }
 

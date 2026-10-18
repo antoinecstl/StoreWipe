@@ -16,6 +16,8 @@ public final class LibraryOverviewModel {
 
     public private(set) var counts: DecisionCounts = .zero
     public private(set) var months: [MonthSummary] = []
+    /// Captures d'écran restant à trier (métadonnées système, sans analyse d'image).
+    public private(set) var screenshotsToSort = 0
     public private(set) var resumable: ResumableSession?
     public private(set) var hasLoaded = false
     public private(set) var loadFailed = false
@@ -32,6 +34,7 @@ public final class LibraryOverviewModel {
     public func refresh() async {
         do {
             counts = try await store.decisionCounts()
+            screenshotsToSort = try await store.toSortCount(filter: .screenshots)
             resumable = try await loadResumable()
             hasLoaded = true
             loadFailed = false

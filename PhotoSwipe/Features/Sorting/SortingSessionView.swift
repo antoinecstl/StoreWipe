@@ -7,6 +7,7 @@ import SwiftUI
 struct SortingSessionView: View {
     @Bindable var model: SortingSessionModel
     let onReviewDeferred: () -> Void
+    let onReviewSelection: () -> Void
     let onExit: () -> Void
 
     @Environment(AppEnvironment.self) private var environment
@@ -35,6 +36,7 @@ struct SortingSessionView: View {
                     onUndo: model.canUndo ? { model.undo() } : nil,
                     onContinue: nil,
                     onReviewDeferred: model.stats.deferred > 0 ? onReviewDeferred : nil,
+                    onReviewSelection: model.stats.markedForDeletion > 0 ? onReviewSelection : nil,
                     onFinish: onExit
                 )
             } else {
@@ -74,6 +76,12 @@ struct SortingSessionView: View {
                 onUndo: nil,
                 onContinue: { isShowingPauseSummary = false },
                 onReviewDeferred: nil,
+                onReviewSelection: model.stats.markedForDeletion > 0
+                    ? {
+                        isShowingPauseSummary = false
+                        onReviewSelection()
+                    }
+                    : nil,
                 onFinish: {
                     isShowingPauseSummary = false
                     onExit()

@@ -54,6 +54,8 @@ struct SessionScopeTests {
         SessionScope(filter: .undated, pool: .deferredOnly),
         SessionScope(filter: .month(MonthKey(year: 1999, month: 12)!), pool: .keptReview),
         SessionScope(filter: .all, pool: .keptReview),
+        SessionScope(filter: .screenshots, pool: .standard),
+        SessionScope(filter: .screenshots, pool: .deferredOnly),
     ])
     func storageRoundTrip(scope: SessionScope) {
         #expect(SessionScope(storageValue: scope.storageValue) == scope)

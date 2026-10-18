@@ -7,6 +7,8 @@ public struct SessionScope: Sendable, Hashable {
         case month(MonthKey)
         /// Photos sans date de création.
         case undated
+        /// Captures d'écran, d'après les métadonnées système (aucune analyse d'image).
+        case screenshots
     }
 
     public enum Pool: String, Sendable, Hashable, CaseIterable {
@@ -57,6 +59,7 @@ public struct SessionScope: Sendable, Hashable {
         case .all: filterValue = "all"
         case .month(let month): filterValue = "month:\(month.rawValue)"
         case .undated: filterValue = "undated"
+        case .screenshots: filterValue = "screenshots"
         }
         return "\(pool.rawValue)|\(filterValue)"
     }
@@ -70,6 +73,8 @@ public struct SessionScope: Sendable, Hashable {
             filter = .all
         case "undated":
             filter = .undated
+        case "screenshots":
+            filter = .screenshots
         case let value where value.hasPrefix("month:"):
             guard let raw = Int(value.dropFirst("month:".count)), let month = MonthKey(rawValue: raw) else { return nil }
             filter = .month(month)

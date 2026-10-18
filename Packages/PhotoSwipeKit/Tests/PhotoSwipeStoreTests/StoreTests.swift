@@ -388,3 +388,59 @@ struct StoreSessionTests {
         #expect(try await store.beginSyncGeneration() == 1)
     }
 }
+
+@Suite("Store – captures d'écran et purge")
+struct ScreenshotAndPurgeTests {
+    private func indexed() async throws -> PhotoSwipeStore {
+        let store = try PhotoSwipeStore(url: nil)
+        let generation = try await store.beginSyncGeneration()
+        let shot = { (id: String, day: Int) in
+            AssetSummary(
+                id: AssetID(id),
+                creationDate: Date(timeIntervalSince1970: 1_704_110_400 + Double(day) * 86_400),
+                pixelWidth: 1170,
+                pixelHeight: 2532,
+                subtypes: [.screenshot]
+            )
+        }
+        _ = try await store.upsertAssets(
+            [shot("s1", 1), shot("s2", 2), photo("p1", day: 3), photo("p2", day: 4)],
+            generation: generation,
+            calendar: utcCalendar
+        )
+        return store
+    }
+
+    @Test func screenshotFilterSelectsOnlyScreenshots() async throws {
+        let store = try await indexed()
+        let session = try await store.startSession(scope: SessionScope(filter: .screenshots), at: Date())
+        let page = try await store.queuePage(
+            QueueRequest(filter: .screenshots, phase: .main, sessionID: session.id, limit: 10)
+        )
+        #expect(Set(page.map(\.id)) == ["s1", "s2"])
+    }
+
+    @Test func toSortCountIgnoresHandledScreenshots() async throws {
+        let store = try await indexed()
+        #expect(try await store.toSortCount(filter: .screenshots) == 2)
+        try await store.applyDecision(.kept, to: "s1", sessionID: nil, at: Date())
+        #expect(try await store.toSortCount(filter: .screenshots) == 1)
+        // Une capture passée reste à trier.
+        try await store.applyDecision(.deferred, to: "s2", sessionID: nil, at: Date())
+        #expect(try await store.toSortCount(filter: .screenshots) == 1)
+        #expect(try await store.toSortCount(filter: .all) == 3)
+    }
+
+    @Test func purgeRemovesAssetsDecisionsAndEventsOnly() async throws {
+        let store = try await indexed()
+        try await store.applyDecision(.markedForDeletion, to: "s1", sessionID: nil, at: Date())
+        try await store.applyDecision(.markedForDeletion, to: "p1", sessionID: nil, at: Date())
+        try await store.purge(["s1"])
+        #expect(try await store.asset("s1") == nil)
+        #expect(try await store.decision(for: "s1") == nil)
+        #expect(try await store.asset("p1") != nil)
+        #expect(try await store.decision(for: "p1")?.decision == .markedForDeletion)
+        try await store.purge([])
+        #expect(try await store.assetCount() == 3)
+    }
+}

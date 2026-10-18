@@ -11,6 +11,7 @@ struct SortingScreen: View {
 
     let source: Source
     let onExit: () -> Void
+    let onReviewSelection: () -> Void
 
     @Environment(AppEnvironment.self) private var environment
     @State private var model: SortingSessionModel?
@@ -22,6 +23,7 @@ struct SortingScreen: View {
                 SortingSessionView(
                     model: model,
                     onReviewDeferred: { reviewDeferred(of: model.scope) },
+                    onReviewSelection: onReviewSelection,
                     onExit: onExit
                 )
             } else if didFail {

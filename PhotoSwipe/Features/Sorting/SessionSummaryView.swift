@@ -9,6 +9,7 @@ struct SessionSummaryView: View {
     let onUndo: (() -> Void)?
     let onContinue: (() -> Void)?
     let onReviewDeferred: (() -> Void)?
+    let onReviewSelection: (() -> Void)?
     let onFinish: () -> Void
 
     var body: some View {
@@ -68,6 +69,14 @@ struct SessionSummaryView: View {
                     Text("Continuer le tri").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+            if let onReviewSelection {
+                Button(action: onReviewSelection) {
+                    Label("Revoir la sélection à supprimer", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
                 .controlSize(.large)
             }
             if let onReviewDeferred {

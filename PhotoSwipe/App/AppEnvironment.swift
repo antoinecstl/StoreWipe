@@ -18,6 +18,7 @@ enum StorageIssue: Equatable {
 final class AppEnvironment {
     let store: PhotoSwipeStore
     let library: any PhotoLibraryService
+    let deleter: any AssetDeleting
     let images: any AssetImageProviding
     let settings: AppSettings
     let sync: LibrarySyncCoordinator
@@ -32,6 +33,7 @@ final class AppEnvironment {
     init(
         store: PhotoSwipeStore,
         library: any PhotoLibraryService,
+        deleter: any AssetDeleting,
         images: any AssetImageProviding,
         settings: AppSettings,
         storageIssue: StorageIssue?,
@@ -39,6 +41,7 @@ final class AppEnvironment {
     ) {
         self.store = store
         self.library = library
+        self.deleter = deleter
         self.images = images
         self.settings = settings
         self.storageIssue = storageIssue
@@ -59,9 +62,11 @@ final class AppEnvironment {
 
     private static func makeLive() -> AppEnvironment {
         let (store, issue) = openStore(fileName: "PhotoSwipe.sqlite")
+        let library = PhotoKitLibraryService()
         return AppEnvironment(
             store: store,
-            library: PhotoKitLibraryService(),
+            library: library,
+            deleter: library,
             images: PhotoKitImageProvider(),
             settings: AppSettings(defaults: .standard),
             storageIssue: issue,
@@ -92,6 +97,7 @@ final class AppEnvironment {
         return AppEnvironment(
             store: store,
             library: library,
+            deleter: library,
             images: DemoImageProvider(),
             settings: AppSettings(defaults: .standard, keyPrefix: "demo."),
             storageIssue: issue,
@@ -172,6 +178,12 @@ final class AppEnvironment {
 
     func resumeActiveSession() async throws -> SortingSessionModel? {
         try await SessionLauncher.resumeActive(store: store)
+    }
+
+    // MARK: - Suppression
+
+    func makeDeletionReview() -> DeletionReviewModel {
+        DeletionReviewModel(store: store, library: library, deleter: deleter)
     }
 
     // MARK: - Réinitialisation

@@ -35,6 +35,8 @@ enum DisplayFormat {
             base = monthTitle(month)
         case .undated:
             base = String(localized: "Sans date")
+        case .screenshots:
+            base = String(localized: "Captures d'écran")
         }
         switch scope.pool {
         case .standard: return base

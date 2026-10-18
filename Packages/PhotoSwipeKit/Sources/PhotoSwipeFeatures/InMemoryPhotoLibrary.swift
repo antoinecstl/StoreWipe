@@ -14,6 +14,8 @@ public final class InMemoryPhotoLibrary: PhotoLibraryService {
         var authorizationOnRequest: LibraryAuthorization
         var continuations: [UUID: AsyncStream<Void>.Continuation] = [:]
         var enumerationCount = 0
+        var userRefusesDeletion = false
+        var undeletable: Set<AssetID> = []
     }
 
     private let state: Mutex<State>
@@ -140,6 +142,16 @@ public final class InMemoryPhotoLibrary: PhotoLibraryService {
         }
     }
 
+    /// Simule un refus de l'utilisateur dans l'alerte de suppression d'iOS.
+    public func setUserRefusesDeletion(_ refuses: Bool) {
+        state.withLock { $0.userRefusesDeletion = refuses }
+    }
+
+    /// Photos que le système ne parvient pas à supprimer (suppression partielle).
+    public func setUndeletable(_ ids: Set<AssetID>) {
+        state.withLock { $0.undeletable = ids }
+    }
+
     private static func visibleAssets(in state: State) -> [AssetSummary] {
         let candidates: [AssetSummary]
         switch state.authorization {
@@ -156,6 +168,22 @@ public final class InMemoryPhotoLibrary: PhotoLibraryService {
                 if lhs.sortDate != rhs.sortDate { return lhs.sortDate > rhs.sortDate }
                 return lhs.id.rawValue > rhs.id.rawValue
             }
+    }
+}
+
+extension InMemoryPhotoLibrary: AssetDeleting {
+    public func deleteAssets(_ ids: [AssetID]) async throws -> Bool {
+        let confirmed = state.withLock { state -> Bool in
+            if state.userRefusesDeletion { return false }
+            for id in ids where !state.undeletable.contains(id) {
+                state.assets.removeValue(forKey: id)
+                state.hidden.remove(id)
+                state.limitedSelection.remove(id)
+            }
+            return true
+        }
+        if confirmed { notifyChange() }
+        return confirmed
     }
 }
 

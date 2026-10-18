@@ -151,6 +151,27 @@ extension PhotoKitLibraryService: LimitedSelectionManaging {
     }
 }
 
+extension PhotoKitLibraryService: AssetDeleting {
+    /// Supprime via PhotoKit : iOS affiche sa propre alerte de confirmation, et les photos
+    /// vont dans « Supprimés récemment ».
+    func deleteAssets(_ ids: [AssetID]) async throws -> Bool {
+        let identifiers = ids.map(\.rawValue)
+        guard !identifiers.isEmpty else { return true }
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                let assets = PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil)
+                PHAssetChangeRequest.deleteAssets(assets)
+            }
+            return true
+        } catch {
+            if (error as? PHPhotosError)?.code == .userCancelled || (error as? CocoaError)?.code == .userCancelled {
+                return false
+            }
+            throw error
+        }
+    }
+}
+
 extension AssetSummary {
     init(photoKitAsset asset: PHAsset) {
         var subtypes: AssetSubtypes = []
