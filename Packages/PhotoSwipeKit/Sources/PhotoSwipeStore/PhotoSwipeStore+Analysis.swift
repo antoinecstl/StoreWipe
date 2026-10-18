@@ -9,7 +9,7 @@ extension PhotoSwipeStore {
     /// `excluding` écarte les photos déjà tentées pendant cette passe (image indisponible).
     public func assetsToAnalyze(limit: Int, excluding: [AssetID] = []) throws -> [AssetSummary] {
         var clauses = [
-            "a.visibility = 0",
+            visible,
             "(x.local_id IS NULL OR x.fingerprint != a.fingerprint)",
         ]
         var arguments: [SQLValue] = []
@@ -72,7 +72,7 @@ extension PhotoSwipeStore {
             SELECT COUNT(*),
                    COALESCE(SUM(CASE WHEN x.local_id IS NOT NULL AND x.fingerprint = a.fingerprint THEN 1 ELSE 0 END), 0)
             FROM assets a LEFT JOIN analyses x ON x.local_id = a.local_id
-            WHERE a.visibility = 0;
+            WHERE \(visible);
             """
         ) { AnalysisProgress(total: $0.int(0), analyzed: $0.int(1)) }.first ?? AnalysisProgress()
     }
@@ -83,7 +83,7 @@ extension PhotoSwipeStore {
             """
             SELECT l.label, COUNT(*) FROM analysis_labels l
             JOIN assets a ON a.local_id = l.local_id
-            WHERE a.visibility = 0 AND l.confidence >= ?
+            WHERE \(visible) AND l.confidence >= ?
             GROUP BY l.label
             ORDER BY COUNT(*) DESC, l.label ASC
             LIMIT ?;
@@ -96,7 +96,7 @@ extension PhotoSwipeStore {
     public func matchCount(rule: CategoryRule) throws -> Int {
         let condition = Self.condition(for: rule)
         return Int(try connection.scalarInt(
-            "SELECT COUNT(*) FROM assets a WHERE a.visibility = 0 AND \(condition.sql);",
+            "SELECT COUNT(*) FROM assets a WHERE \(visible) AND \(condition.sql);",
             condition.arguments
         ) ?? 0)
     }
@@ -194,7 +194,7 @@ extension PhotoSwipeStore {
     @discardableResult
     public func markAllToSort(filter: SessionScope.Filter, as decision: Decision, at date: Date) throws -> Int {
         guard decision != .unreviewed else { return 0 }
-        var clauses = ["a.visibility = 0", "(d.decision IS NULL OR d.decision = 3)"]
+        var clauses = [visible, "(d.decision IS NULL OR d.decision = 3)"]
         var arguments: [SQLValue] = []
         try appendFilter(filter, to: &clauses, arguments: &arguments)
         let ids = try connection.query(

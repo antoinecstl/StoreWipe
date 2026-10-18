@@ -48,6 +48,19 @@ public final class DeletionReviewModel {
 
     public func isSelected(_ id: AssetID) -> Bool { !excluded.contains(id) }
 
+    /// Taille mesurée des fichiers sélectionnés et nombre de fichiers concernés. Le volume réellement
+    /// libéré dépend d'iCloud et de « Supprimés récemment » : il ne doit jamais être promis.
+    public var selectedSize: SizeSummary {
+        var summary = SizeSummary()
+        for item in items where !excluded.contains(item.id) {
+            if let size = item.byteSize {
+                summary.count += 1
+                summary.bytes += size
+            }
+        }
+        return summary
+    }
+
     public func load() async {
         items = (try? await store.markedForDeletion()) ?? []
         excluded = []

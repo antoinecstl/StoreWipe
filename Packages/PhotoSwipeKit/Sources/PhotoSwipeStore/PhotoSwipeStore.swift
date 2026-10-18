@@ -60,6 +60,8 @@ public enum AssetVisibility: Int, Sendable {
 /// une fermeture forcée de l'app ne perd aucune décision déjà affichée comme prise.
 public actor PhotoSwipeStore {
     let connection: SQLiteConnection
+    /// Inclure les vidéos dans le tri, les compteurs et les analyses.
+    var includesVideos = true
 
     /// - Parameter url: fichier de base ; `nil` pour une base en mémoire (tests, mode dégradé).
     public init(url: URL?) throws {
@@ -69,6 +71,15 @@ public actor PhotoSwipeStore {
     }
 
     public static var schemaVersion: Int { Schema.latestVersion }
+
+    public func setIncludesVideos(_ value: Bool) {
+        includesVideos = value
+    }
+
+    /// Condition de visibilité commune aux compteurs et aux piles de tri.
+    var visible: String {
+        includesVideos ? "a.visibility = 0" : "a.visibility = 0 AND a.media_type = 0"
+    }
 
     // MARK: - Index de la photothèque
 
@@ -101,8 +112,8 @@ public actor PhotoSwipeStore {
                 INSERT INTO assets (
                     local_id, sort_date, creation_date, modification_date, month_key,
                     pixel_width, pixel_height, subtypes, burst_id, is_favorite, fingerprint,
-                    visibility, last_seen_generation, first_seen_at, inaccessible_since
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, NULL)
+                    visibility, last_seen_generation, first_seen_at, inaccessible_since, media_type, duration, byte_size
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, NULL, ?, ?, ?)
                 ON CONFLICT(local_id) DO UPDATE SET
                     sort_date = excluded.sort_date,
                     creation_date = excluded.creation_date,
@@ -116,7 +127,10 @@ public actor PhotoSwipeStore {
                     fingerprint = excluded.fingerprint,
                     visibility = 0,
                     last_seen_generation = excluded.last_seen_generation,
-                    inaccessible_since = NULL;
+                    inaccessible_since = NULL,
+                    media_type = excluded.media_type,
+                    duration = excluded.duration,
+                    byte_size = CASE WHEN assets.fingerprint != excluded.fingerprint THEN excluded.byte_size ELSE COALESCE(excluded.byte_size, assets.byte_size) END;
                 """
             )
             var result = UpsertResult()
@@ -139,6 +153,9 @@ public actor PhotoSwipeStore {
                     .text(fingerprint),
                     .integer(generation),
                     .date(date),
+                    .int(asset.mediaKind.rawValue),
+                    asset.duration.map { SQLValue.real($0) } ?? .null,
+                    asset.byteSize.map { SQLValue.integer($0) } ?? .null,
                 ])
                 while try upsert.step() {}
                 if let previousFingerprint {
@@ -367,7 +384,7 @@ public actor PhotoSwipeStore {
                 COALESCE(SUM(CASE WHEN d.decision = 2 THEN 1 ELSE 0 END), 0),
                 COALESCE(SUM(CASE WHEN d.decision = 3 THEN 1 ELSE 0 END), 0)
             FROM assets a LEFT JOIN decisions d ON d.local_id = a.local_id
-            WHERE a.visibility = 0;
+            WHERE \(visible);
             """
         ) { row in
             DecisionCounts(
@@ -382,7 +399,7 @@ public actor PhotoSwipeStore {
 
     /// Photos restant à trier (non examinées ou passées) pour un filtre donné.
     public func toSortCount(filter: SessionScope.Filter) throws -> Int {
-        var clauses = ["a.visibility = 0", "(d.decision IS NULL OR d.decision = 3)"]
+        var clauses = [visible, "(d.decision IS NULL OR d.decision = 3)"]
         var arguments: [SQLValue] = []
         try appendFilter(filter, to: &clauses, arguments: &arguments)
         return Int(try connection.scalarInt(
@@ -405,7 +422,7 @@ public actor PhotoSwipeStore {
                 SUM(CASE WHEN d.decision = 2 THEN 1 ELSE 0 END),
                 SUM(CASE WHEN d.decision = 3 THEN 1 ELSE 0 END)
             FROM assets a LEFT JOIN decisions d ON d.local_id = a.local_id
-            WHERE a.visibility = 0
+            WHERE \(visible)
             GROUP BY a.month_key
             ORDER BY a.month_key IS NULL, a.month_key DESC;
             """
@@ -516,7 +533,7 @@ public actor PhotoSwipeStore {
     // MARK: - Piles de tri
 
     public func queuePage(_ request: QueueRequest) throws -> [QueueItem] {
-        var clauses = ["a.visibility = 0"]
+        var clauses = [visible]
         var arguments: [SQLValue] = []
         try appendFilter(request.filter, to: &clauses, arguments: &arguments)
         appendPhase(request.phase, sessionID: request.sessionID, to: &clauses, arguments: &arguments)
@@ -545,8 +562,8 @@ public actor PhotoSwipeStore {
         return try connection.query(sql, arguments) { row in
             QueueItem(
                 asset: try Self.decodeAsset(row),
-                decision: row.optionalInt(8).flatMap(Decision.init(rawValue:)) ?? .unreviewed,
-                decidedAt: row.optionalDate(9),
+                decision: row.optionalInt(Self.assetColumnCount).flatMap(Decision.init(rawValue:)) ?? .unreviewed,
+                decidedAt: row.optionalDate(Self.assetColumnCount + 1),
                 phase: request.phase
             )
         }
@@ -556,7 +573,7 @@ public actor PhotoSwipeStore {
     public func remainingCount(for session: SortingSessionRecord) throws -> Int {
         var total = 0
         for phase in session.scope.phases {
-            var clauses = ["a.visibility = 0"]
+            var clauses = [visible]
             var arguments: [SQLValue] = []
             try appendFilter(session.scope.filter, to: &clauses, arguments: &arguments)
             appendPhase(phase, sessionID: session.id, to: &clauses, arguments: &arguments)
@@ -654,7 +671,9 @@ public actor PhotoSwipeStore {
     // MARK: - Décodage
 
     static let assetColumns =
-        "a.local_id, a.creation_date, a.modification_date, a.pixel_width, a.pixel_height, a.subtypes, a.burst_id, a.is_favorite"
+        "a.local_id, a.creation_date, a.modification_date, a.pixel_width, a.pixel_height, a.subtypes, a.burst_id, a.is_favorite, a.media_type, a.duration, a.byte_size"
+    /// Nombre de colonnes de `assetColumns` (les colonnes suivantes d'une requête commencent après).
+    static let assetColumnCount: Int32 = 11
 
     private static let sessionColumns = "id, scope, started_at, ended_at, cursor_sort_date, cursor_local_id"
 
@@ -671,7 +690,10 @@ public actor PhotoSwipeStore {
             pixelHeight: row.int(offset + 4),
             subtypes: AssetSubtypes(rawValue: row.int(offset + 5)),
             burstIdentifier: row.optionalText(offset + 6),
-            isFavorite: row.int(offset + 7) != 0
+            isFavorite: row.int(offset + 7) != 0,
+            mediaKind: MediaKind(rawValue: row.int(offset + 8)) ?? .image,
+            duration: row.optionalDouble(offset + 9),
+            byteSize: row.optionalInt64(offset + 10)
         )
     }
 

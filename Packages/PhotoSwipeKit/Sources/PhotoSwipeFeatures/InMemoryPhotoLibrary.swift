@@ -172,6 +172,18 @@ public final class InMemoryPhotoLibrary: PhotoLibraryService {
     }
 }
 
+extension InMemoryPhotoLibrary: AssetSizing {
+    public func byteSizes(for ids: [AssetID]) async -> [AssetID: Int64] {
+        state.withLock { state in
+            var sizes: [AssetID: Int64] = [:]
+            for id in ids {
+                if let size = state.assets[id]?.byteSize { sizes[id] = size }
+            }
+            return sizes
+        }
+    }
+}
+
 extension InMemoryPhotoLibrary: AssetDeleting {
     public func deleteAssets(_ ids: [AssetID]) async throws -> Bool {
         let confirmed = state.withLock { state -> Bool in
@@ -205,13 +217,17 @@ public enum SampleLibrary {
             let offset: TimeInterval = -Double(index) * step
             let isPortrait = index % 3 == 0
             let subtypes: AssetSubtypes = index % 7 == 0 ? [.screenshot] : []
+            let isVideo = index % 9 == 4
             return AssetSummary(
                 id: id,
                 creationDate: newest.addingTimeInterval(offset),
                 pixelWidth: isPortrait ? 3024 : 4032,
                 pixelHeight: isPortrait ? 4032 : 3024,
                 subtypes: subtypes,
-                isFavorite: index % 11 == 0
+                isFavorite: index % 11 == 0,
+                mediaKind: isVideo ? .video : .image,
+                duration: isVideo ? Double(8 + (index * 7) % 170) : nil,
+                byteSize: isVideo ? Int64(40 + (index * 13) % 400) * 1_000_000 : Int64(1_500_000 + (index * 97_000) % 4_000_000)
             )
         }
     }

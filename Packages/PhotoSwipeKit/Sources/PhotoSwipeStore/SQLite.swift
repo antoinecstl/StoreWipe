@@ -213,6 +213,14 @@ struct SQLiteRow {
         isNull(column) ? nil : int(column)
     }
 
+    func optionalDouble(_ column: Int32) -> Double? {
+        isNull(column) ? nil : double(column)
+    }
+
+    func optionalInt64(_ column: Int32) -> Int64? {
+        isNull(column) ? nil : int64(column)
+    }
+
     func optionalDate(_ column: Int32) -> Date? {
         isNull(column) ? nil : Date(timeIntervalSince1970: double(column))
     }

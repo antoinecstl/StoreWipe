@@ -102,6 +102,13 @@ enum Schema {
             );
             """,
         ]),
+        Migration(version: 3, statements: [
+            // Vidéos et taille des fichiers. Les lignes existantes sont des images, taille inconnue.
+            "ALTER TABLE assets ADD COLUMN media_type INTEGER NOT NULL DEFAULT 0;",
+            "ALTER TABLE assets ADD COLUMN duration REAL;",
+            "ALTER TABLE assets ADD COLUMN byte_size INTEGER;",
+            "CREATE INDEX assets_by_size ON assets(byte_size DESC);",
+        ]),
     ]
 
     static var latestVersion: Int { migrations.map(\.version).max() ?? 0 }

@@ -29,6 +29,11 @@ public struct AssetSummary: Sendable, Hashable, Identifiable {
     public let subtypes: AssetSubtypes
     public let burstIdentifier: String?
     public let isFavorite: Bool
+    public let mediaKind: MediaKind
+    /// Durée en secondes (vidéos uniquement).
+    public let duration: TimeInterval?
+    /// Taille totale des fichiers en octets, si elle a été mesurée.
+    public let byteSize: Int64?
 
     public init(
         id: AssetID,
@@ -38,7 +43,10 @@ public struct AssetSummary: Sendable, Hashable, Identifiable {
         pixelHeight: Int,
         subtypes: AssetSubtypes = [],
         burstIdentifier: String? = nil,
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        mediaKind: MediaKind = .image,
+        duration: TimeInterval? = nil,
+        byteSize: Int64? = nil
     ) {
         self.id = id
         self.creationDate = creationDate
@@ -48,6 +56,9 @@ public struct AssetSummary: Sendable, Hashable, Identifiable {
         self.subtypes = subtypes
         self.burstIdentifier = burstIdentifier
         self.isFavorite = isFavorite
+        self.mediaKind = mediaKind
+        self.duration = duration
+        self.byteSize = byteSize
     }
 
     /// Date utilisée pour l'ordre des piles. Les photos sans date de création sont placées à la fin.
@@ -66,7 +77,9 @@ public struct AssetSummary: Sendable, Hashable, Identifiable {
     /// des métadonnées qui n'invalident pas une analyse visuelle.
     public var contentFingerprint: String {
         let modification = modificationDate.map { String(format: "%.3f", $0.timeIntervalSince1970) } ?? "-"
-        return "\(modification)|\(pixelWidth)x\(pixelHeight)|\(subtypes.rawValue)"
+        let base = "\(modification)|\(pixelWidth)x\(pixelHeight)|\(subtypes.rawValue)"
+        // Le format des images ne change pas : leurs analyses déjà enregistrées restent valables.
+        return mediaKind == .video ? base + "|video|\(Int(duration ?? 0))" : base
     }
 }
 
