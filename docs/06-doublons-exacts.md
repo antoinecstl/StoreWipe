@@ -1,6 +1,6 @@
 # Spécification — doublons exacts (incrément D)
 
-Statut : **spécifiée, non implémentée.** Cette définition est fixée avant le développement, conformément au principe 7.
+Statut : **spécifiée ; seule la détection de doublons *probables* (dimensions, seconde de création, taille) est implémentée, sans empreinte.** Cette définition est fixée avant le développement, conformément au principe 7.
 
 ## 1. Définition V1 (stricte)
 

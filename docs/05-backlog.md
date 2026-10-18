@@ -42,7 +42,7 @@ Légende : ✅ fait et testé (tests du paquet, Linux et macOS) · 🟡 impléme
 | C-03 | Suppression PhotoKit | `PHAssetChangeRequest.deleteAssets` ; annulation par l'utilisateur dans l'alerte iOS → aucun compteur modifié, message neutre | ✅ logique · 🟡 PhotoKit |
 | C-04 | Résultat réel | Après l'opération, vérification par identifiant ; seuls les assets réellement absents sont comptés et purgés | ✅ |
 | C-05 | Changements concurrents | Photos déjà supprimées, devenues inaccessibles ou modifiées depuis la décision : signalées et exclues | 🟡 partiel (la sélection ne liste que les photos accessibles ; pas de signalement des modifiées) |
-| C-06 | Volume estimé | Mesuré par lecture des ressources locales ; affiché avec sa couverture (« pour 45 photos sur 50 ») ; jamais promis comme espace libéré immédiatement | ⬜ |
+| C-06 | Volume estimé | Mesuré par lecture des ressources locales ; affiché avec sa couverture (« pour 45 photos sur 50 ») ; jamais promis comme espace libéré immédiatement | ✅ logique · 🟡 UI (clé `fileSize` de PHAssetResource, non documentée par Apple) |
 | C-07 | Bilan de session | Bouton « Revoir la sélection » | 🟡 |
 
 ## Incrément D — Captures d'écran et doublons exacts
@@ -51,8 +51,8 @@ Légende : ✅ fait et testé (tests du paquet, Linux et macOS) · 🟡 impléme
 |----|---------|------------------------|
 | D-01 | Pile « Captures d'écran » | Métadonnées uniquement ; disponible immédiatement après indexation | ✅ logique · 🟡 UI |
 | D-02 | Migration v2 `resource_digests` | Migration testée depuis v1 |
-| D-03 | Doublons exacts | Conforme à la [spécification](06-doublons-exacts.md) ; tests HEIC/JPEG, retouche, Live Photo, iCloud |
-| D-04 | Groupes de doublons | Exemplaire conservé suggéré avec règle visible ; impossible de tout supprimer |
+| D-03 | Doublons exacts | Conforme à la [spécification](06-doublons-exacts.md) ; tests HEIC/JPEG, retouche, Live Photo, iCloud | 🟡 **doublons probables** livrés (mêmes dimensions, seconde et taille) ; empreinte SHA-256 à faire pour parler de doublons « exacts » |
+| D-04 | Groupes de doublons | Exemplaire conservé suggéré avec règle visible ; impossible de tout supprimer | 🟡 règle affichée, un exemplaire toujours conservé ; albums d'appartenance non affichés |
 | D-05 | Réglage iCloud doublons | Désactivé par défaut ; statut « non vérifiable » |
 
 ## Incrément E — Classifieur local
@@ -77,3 +77,15 @@ Légende : ✅ fait et testé (tests du paquet, Linux et macOS) · 🟡 impléme
 | F-05 | Localisation anglaise (catalogue de chaînes prêt) |
 | F-06 | [Checklist TestFlight / App Store](10-checklist-testflight.md) |
 | F-07 | Synchronisation incrémentale via `PHPhotoLibrary.fetchPersistentChanges(since:)` si l'énumération complète s'avère trop coûteuse |
+
+## Ajouts hors plan initial
+
+| Élément | Statut |
+|---------|--------|
+| Vidéos dans l'index, le tri, la suppression ; réglage « Inclure les vidéos » ; lecture plein écran | ✅ logique · 🟡 PhotoKit et UI |
+| Mesure des tailles en arrière-plan (métadonnées, sans lecture) | ✅ logique · 🟡 PhotoKit |
+| Écran « Gros fichiers » (type, seuil, sélection groupée) | 🟡 |
+| Ordre du tri réglable (par défaut : plus anciennes d'abord) | ✅ logique · 🟡 UI |
+| Pile « Vidéos », marquage en lot avec confirmation | 🟡 |
+| Raison affichée dans les piles de catégorie (« Proposée car : … ») | 🟡 |
+| Publication de l'IPA non signée dans la pré-release `latest` | ✅ CI |
