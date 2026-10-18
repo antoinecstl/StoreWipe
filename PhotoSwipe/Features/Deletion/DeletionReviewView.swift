@@ -9,6 +9,7 @@ struct DeletionReviewView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var model: DeletionReviewModel?
     @State private var isConfirming = false
+    @State private var preview: AssetSummary?
 
     var body: some View {
         Group {
@@ -40,7 +41,7 @@ struct DeletionReviewView: View {
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Touchez une photo pour la garder. Rien n'est supprimé avant votre confirmation.")
+                    Text("Touchez une photo pour la garder, appui long pour la voir. Rien n'est supprimé avant votre confirmation.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 16)
@@ -49,10 +50,10 @@ struct DeletionReviewView: View {
                         ForEach(model.items) { asset in
                             DeletionCell(
                                 asset: asset,
-                                isSelected: model.isSelected(asset.id)
-                            ) {
-                                Task { await model.toggle(asset.id) }
-                            }
+                                isSelected: model.isSelected(asset.id),
+                                toggle: { Task { await model.toggle(asset.id) } },
+                                onPreview: { preview = asset }
+                            )
                         }
                     }
                     .padding(.horizontal, 4)
@@ -60,6 +61,9 @@ struct DeletionReviewView: View {
                 .padding(.vertical, 12)
             }
             .safeAreaInset(edge: .bottom) { bottomBar(model) }
+            .fullScreenCover(item: $preview) { asset in
+                MediaPreviewScreen(asset: asset)
+            }
             .confirmationDialog(
                 "Supprimer \(model.selectedCount) photos ?",
                 isPresented: $isConfirming,
@@ -166,6 +170,7 @@ private struct DeletionCell: View {
     let asset: AssetSummary
     let isSelected: Bool
     let toggle: () -> Void
+    let onPreview: () -> Void
 
     var body: some View {
         Button(action: toggle) {
@@ -187,6 +192,13 @@ private struct DeletionCell: View {
                 }
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                onPreview()
+            } label: {
+                Label(asset.mediaKind == .video ? "Lire" : "Aperçu", systemImage: "eye")
+            }
+        }
         .accessibilityLabel(isSelected ? Text("Photo à supprimer") : Text("Photo conservée"))
         .accessibilityHint(Text("Touchez pour changer"))
     }

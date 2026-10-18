@@ -13,7 +13,7 @@ import Vision
 /// une photo uniquement présente dans iCloud est ignorée.
 struct VisionImageAnalyzer: ImageAnalyzing {
     /// Plus grande dimension de l'image analysée (suffisant pour classer et mesurer le texte).
-    private static let analysisPixelSize: CGFloat = 1024
+    private static let analysisPixelSize: CGFloat = 768
     private static let minimumLabelConfidence: Float = 0.1
     private static let maximumLabelCount = 15
 
@@ -94,6 +94,12 @@ private final class OnceGate: @unchecked Sendable {
 }
 
 #if DEBUG
+/// Hacheur factice du mode démonstration : aucune photo réelle à lire.
+struct DemoResourceHasher: ResourceHashing {
+    func partialDigest(for id: AssetID, allowsNetwork: Bool) async -> DigestOutcome { .unavailable }
+    func fullDigest(for id: AssetID, expectedBytes: Int64, allowsNetwork: Bool) async -> DigestOutcome { .unavailable }
+}
+
 /// Analyse factice déterministe pour le mode démonstration (le simulateur ne peut pas exécuter Vision).
 struct DemoImageAnalyzer: ImageAnalyzing {
     func analyze(_ id: AssetID) async throws -> ImageAnalysis? {

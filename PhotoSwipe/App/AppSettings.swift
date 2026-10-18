@@ -12,6 +12,7 @@ final class AppSettings {
         case sortOrder
         case analysisEnabled
         case includesVideos
+        case allowsNetworkForDuplicates
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -26,6 +27,12 @@ final class AppSettings {
     /// cette version) ni la vérification des doublons.
     var allowsNetworkForDisplay: Bool {
         didSet { defaults.set(allowsNetworkForDisplay, forKey: key(.allowsNetworkForDisplay)) }
+    }
+
+    /// Autorise Photos à télécharger depuis iCloud les fichiers nécessaires à la vérification des doublons.
+    /// Désactivé par défaut : consommation de données.
+    var allowsNetworkForDuplicates: Bool {
+        didSet { defaults.set(allowsNetworkForDuplicates, forKey: key(.allowsNetworkForDuplicates)) }
     }
 
     /// Inclure les vidéos dans le tri, les compteurs et les analyses.
@@ -50,6 +57,7 @@ final class AppSettings {
         allowsNetworkForDisplay = defaults.object(forKey: keyPrefix + Key.allowsNetworkForDisplay.rawValue) as? Bool ?? true
         analysisEnabled = defaults.object(forKey: keyPrefix + Key.analysisEnabled.rawValue) as? Bool ?? false
         includesVideos = defaults.object(forKey: keyPrefix + Key.includesVideos.rawValue) as? Bool ?? true
+        allowsNetworkForDuplicates = defaults.object(forKey: keyPrefix + Key.allowsNetworkForDuplicates.rawValue) as? Bool ?? false
         sortOrder = defaults.string(forKey: keyPrefix + Key.sortOrder.rawValue).flatMap(PresentationOrder.init(rawValue:)) ?? .oldestFirst
     }
 
@@ -59,6 +67,7 @@ final class AppSettings {
         sortOrder = .oldestFirst
         analysisEnabled = false
         includesVideos = true
+        allowsNetworkForDuplicates = false
         for key in Key.allCases {
             defaults.removeObject(forKey: self.key(key))
         }

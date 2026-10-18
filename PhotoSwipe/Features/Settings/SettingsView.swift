@@ -63,6 +63,7 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Télécharger depuis iCloud pour afficher", isOn: $settings.allowsNetworkForDisplay)
+                    Toggle("Télécharger pour vérifier les doublons", isOn: $settings.allowsNetworkForDuplicates)
                 } header: {
                     Text("iCloud")
                 } footer: {

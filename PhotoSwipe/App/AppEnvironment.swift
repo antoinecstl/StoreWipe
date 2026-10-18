@@ -24,6 +24,7 @@ final class AppEnvironment {
     let sync: LibrarySyncCoordinator
     let analysis: AnalysisCoordinator
     let sizing: SizeScanCoordinator
+    let duplicateScan: DuplicateScanCoordinator
     let overview: LibraryOverviewModel
     let storageIssue: StorageIssue?
     let isDemoMode: Bool
@@ -38,6 +39,7 @@ final class AppEnvironment {
         deleter: any AssetDeleting,
         analyzer: any ImageAnalyzing,
         sizer: any AssetSizing,
+        hasher: any ResourceHashing,
         images: any AssetImageProviding,
         settings: AppSettings,
         storageIssue: StorageIssue?,
@@ -53,10 +55,13 @@ final class AppEnvironment {
         self.sync = LibrarySyncCoordinator(library: library, store: store, enumerationOrder: { [settings] in settings.sortOrder })
         self.overview = LibraryOverviewModel(store: store)
         self.sizing = SizeScanCoordinator(store: store, sizer: sizer)
-        self.analysis = AnalysisCoordinator(store: store, analyzer: analyzer, shouldPause: {
-            let info = ProcessInfo.processInfo
-            return info.isLowPowerModeEnabled || info.thermalState == .serious || info.thermalState == .critical
-        })
+        self.duplicateScan = DuplicateScanCoordinator(
+            store: store,
+            hasher: hasher,
+            pacing: { Self.devicePacing() },
+            allowsNetwork: { [settings] in settings.allowsNetworkForDuplicates }
+        )
+        self.analysis = AnalysisCoordinator(store: store, analyzer: analyzer, pacing: { Self.devicePacing() })
         self.authorization = library.authorizationStatus()
         if !settings.includesVideos {
             Task { await store.setIncludesVideos(false) }
@@ -81,6 +86,7 @@ final class AppEnvironment {
             deleter: library,
             analyzer: VisionImageAnalyzer(),
             sizer: PhotoKitAssetSizer(),
+            hasher: PhotoKitResourceHasher(),
             images: PhotoKitImageProvider(),
             settings: AppSettings(defaults: .standard),
             storageIssue: issue,
@@ -114,6 +120,7 @@ final class AppEnvironment {
             deleter: library,
             analyzer: DemoImageAnalyzer(),
             sizer: library,
+            hasher: DemoResourceHasher(),
             images: DemoImageProvider(),
             settings: AppSettings(defaults: .standard, keyPrefix: "demo."),
             storageIssue: issue,
@@ -202,6 +209,22 @@ final class AppEnvironment {
 
     // MARK: - Mesures et analyses en arrière-plan
 
+    /// Cadence des travaux de fond : on ralentit quand l'appareil chauffe plutôt que de s'arrêter, et on
+    /// ne suspend qu'en état critique. Un travail lent mais continu finit avant un travail souvent interrompu.
+    static func devicePacing() -> WorkPacing {
+        let info = ProcessInfo.processInfo
+        switch info.thermalState {
+        case .critical:
+            return .paused
+        case .serious:
+            return .throttled(.seconds(1))
+        case .fair:
+            return .throttled(info.isLowPowerModeEnabled ? .milliseconds(600) : .milliseconds(120))
+        default:
+            return info.isLowPowerModeEnabled ? .throttled(.milliseconds(400)) : .full
+        }
+    }
+
     /// Relance la mesure des tailles et, si elle est activée, l'analyse des photos.
     func resumeBackgroundWork() {
         guard authorization.allowsReading else { return }
@@ -286,6 +309,8 @@ final class AppEnvironment {
     func eraseAllData() async throws {
         sync.stop()
         analysis.stop()
+        duplicateScan.stop()
+        sizing.stop()
         await sync.waitUntilIdle()
         try await store.eraseAll()
         images.reset()

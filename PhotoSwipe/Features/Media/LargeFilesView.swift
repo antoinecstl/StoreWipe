@@ -30,6 +30,7 @@ struct LargeFilesView: View {
     @State private var isLoading = true
     @State private var isConfirming = false
     @State private var lastMarked: Int?
+    @State private var preview: AssetSummary?
 
     private struct LoadKey: Hashable {
         let filter: KindFilter
@@ -65,12 +66,7 @@ struct LargeFilesView: View {
                     )
                 }
                 ForEach(items) { entry in
-                    Button {
-                        toggle(entry.id)
-                    } label: {
-                        row(entry)
-                    }
-                    .buttonStyle(.plain)
+                    row(entry)
                 }
             } header: {
                 Text("\(summary.count) fichiers · \(DisplayFormat.byteCount(summary.bytes))")
@@ -96,6 +92,9 @@ struct LargeFilesView: View {
             }
         }
         .safeAreaInset(edge: .bottom) { bottomBar }
+        .fullScreenCover(item: $preview) { asset in
+            MediaPreviewScreen(asset: asset)
+        }
         .task(id: LoadKey(filter: filter, threshold: thresholdMB, revision: environment.sizing.revision, marked: lastMarked ?? 0)) {
             await load()
         }
@@ -131,37 +130,47 @@ struct LargeFilesView: View {
         }
     }
 
+    /// La vignette ouvre l'aperçu (photo ou lecture de la vidéo) ; le reste de la ligne coche ou décoche.
     private func row(_ entry: LargeAsset) -> some View {
         HStack(spacing: 12) {
-            AssetImageView(id: entry.id, pointSize: CGSize(width: 120, height: 120))
-                .frame(width: 60, height: 60)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(alignment: .bottomLeading) {
-                    if entry.asset.mediaKind == .video {
-                        Image(systemName: "play.fill")
-                            .font(.caption2)
-                            .padding(4)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .padding(3)
+            Button {
+                preview = entry.asset
+            } label: {
+                AssetImageView(id: entry.id, pointSize: CGSize(width: 120, height: 120))
+                    .frame(width: 60, height: 60)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay {
+                        Image(systemName: entry.asset.mediaKind == .video ? "play.circle.fill" : "eye.circle.fill")
+                            .font(.title3)
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .black.opacity(0.45))
                             .accessibilityHidden(true)
                     }
-                }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: DisplayFormat.byteCount(entry.asset.byteSize ?? 0))
-                    .font(.headline.monospacedDigit())
-                Text(verbatim: subtitle(for: entry))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 0)
-            Image(systemName: selection.contains(entry.id) ? "checkmark.circle.fill" : "circle")
-                .font(.title3)
-                .foregroundStyle(selection.contains(entry.id) ? Color.accentColor : Color.secondary)
+            .buttonStyle(.borderless)
+            .accessibilityLabel(entry.asset.mediaKind == .video ? Text("Lire la vidéo") : Text("Aperçu de la photo"))
+            Button {
+                toggle(entry.id)
+            } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: DisplayFormat.byteCount(entry.asset.byteSize ?? 0))
+                            .font(.headline.monospacedDigit())
+                        Text(verbatim: subtitle(for: entry))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: selection.contains(entry.id) ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(selection.contains(entry.id) ? Color.accentColor : Color.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .accessibilityAddTraits(selection.contains(entry.id) ? .isSelected : [])
         }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(selection.contains(entry.id) ? .isSelected : [])
     }
 
     private func subtitle(for entry: LargeAsset) -> String {

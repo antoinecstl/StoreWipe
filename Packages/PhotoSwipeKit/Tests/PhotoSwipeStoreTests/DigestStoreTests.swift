@@ -81,7 +81,7 @@ struct DigestStoreTests {
     }
 
     @Test func exactGroupsRequireTheSameFullDigest() async throws {
-        let store = try await indexed([item("a"), item("b"), item("c"), item("d", day: 9), item("v1", kind: .video, bytes: 5_000), item("v2", kind: .video, bytes: 5_000)])
+        let store = try await indexed([item("a"), item("b"), item("c"), item("d", day: 9), item("v1", bytes: 5_000, kind: .video), item("v2", bytes: 5_000, kind: .video)])
         for id in ["a", "b", "c", "d"] {
             try await store.savePartialDigest(for: AssetID(id), eligible: true, partial: "P", at: Date())
         }

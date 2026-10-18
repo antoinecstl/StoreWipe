@@ -221,7 +221,7 @@ struct HomeView: View {
                 Label("Gros fichiers", systemImage: "externaldrive")
             }
             NavigationLink(value: Route.duplicates) {
-                Label("Doublons probables", systemImage: "square.on.square")
+                Label("Doublons", systemImage: "square.on.square")
             }
         } header: {
             Text("Libérer de la place")
@@ -336,16 +336,21 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 8) {
             switch analysis.phase {
             case .running:
-                Label("Analyse en cours", systemImage: "wand.and.stars")
+                Label(analysis.isThrottled ? "Analyse ralentie" : "Analyse en cours", systemImage: "wand.and.stars")
                     .font(.subheadline.weight(.semibold))
                 ProgressView(value: progress.fraction)
+                if analysis.isThrottled {
+                    Text("Ralentie pour ménager l'iPhone (chaleur ou économie d'énergie) : elle continue sans s'arrêter.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 Text("\(progress.analyzed) sur \(progress.total) photos")
                     .font(.footnote.monospacedDigit())
                     .foregroundStyle(.secondary)
             case .paused:
                 Label("Analyse en pause", systemImage: "pause.circle")
                     .font(.subheadline.weight(.semibold))
-                Text("Mode économie d'énergie ou iPhone chaud : elle reprendra d'elle-même.")
+                Text("iPhone très chaud : elle reprendra d'elle-même dès qu'il aura refroidi.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             case .finished:
