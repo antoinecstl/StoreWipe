@@ -6,6 +6,7 @@ import UIKit
 struct OnboardingView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @State private var isRequesting = false
     @State private var problem: String?
 
@@ -94,8 +95,16 @@ struct OnboardingView: View {
     /// Informations de diagnostic affichées quand iOS ne répond pas à la demande d'accès.
     private func diagnostic() -> String {
         let hasUsageText = Bundle.main.object(forInfoDictionaryKey: "NSPhotoLibraryUsageDescription") != nil
+        let appState: String
+        switch UIApplication.shared.applicationState {
+        case .active: appState = "active"
+        case .inactive: appState = "inactive"
+        case .background: appState = "arrière-plan"
+        @unknown default: appState = "inconnue"
+        }
         return "iOS n'a pas répondu à la demande d'accès aux photos. "
             + "État : \(environment.library.authorizationStatus()), "
+            + "app : \(appState), scène : \(String(describing: scenePhase)), "
             + "texte d'autorisation : \(hasUsageText ? "présent" : "absent"), "
             + "identifiant : \(Bundle.main.bundleIdentifier ?? "inconnu")."
     }
