@@ -138,7 +138,8 @@ struct DigestStoreTests {
         try await store.applyDecision(.markedForDeletion, to: "a", sessionID: nil, at: Date())
         #expect(try await store.exactDuplicateGroups().first?.members.count == 2)
         try await store.purge(["b"])
-        #expect(try await store.digestedCount() == 1)
+        // « a » (marquée) et « c » gardent leur empreinte ; celle de « b » est supprimée avec la photo.
+        #expect(try await store.digestedCount() == 2)
         #expect(try await store.exactDuplicateGroups().isEmpty)
         try await store.eraseAll()
         #expect(try await store.digestedCount() == 0)
