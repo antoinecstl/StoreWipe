@@ -13,6 +13,22 @@ enum DisplayFormat {
         return text.prefix(1).uppercased() + text.dropFirst()
     }
 
+    /// Taille lisible (« 85 Mo »), jamais présentée comme de l'espace garanti libéré.
+    static func byteCount(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    /// Durée d'une vidéo (« 1:05 » ou « 1:02:03 »).
+    static func duration(_ seconds: TimeInterval) -> String {
+        let total = Int(seconds.rounded())
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let secs = total % 60
+        return hours > 0
+            ? String(format: "%d:%02d:%02d", hours, minutes, secs)
+            : String(format: "%d:%02d", minutes, secs)
+    }
+
     static func photoDate(_ date: Date?) -> String {
         guard let date else { return String(localized: "Date inconnue") }
         return date.formatted(date: .long, time: .shortened)
@@ -37,6 +53,8 @@ enum DisplayFormat {
             base = String(localized: "Sans date")
         case .screenshots:
             base = String(localized: "Captures d'écran")
+        case .videos:
+            base = String(localized: "Vidéos")
         case .category(let key):
             base = categories.first { $0.key == key }?.name ?? String(localized: "Catégorie")
         }

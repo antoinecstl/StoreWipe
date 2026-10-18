@@ -52,6 +52,9 @@ jobs:
     name: App iOS · IPA non signée (sideloading)
     runs-on: macos-15
     timeout-minutes: 40
+    # Écriture nécessaire pour créer la pré-release « latest ».
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Sélection de la version stable la plus récente de Xcode
@@ -81,3 +84,19 @@ jobs:
           name: PhotoSwipe-ipa-${{ github.sha }}
           path: ipa/PhotoSwipe.ipa
           retention-days: 14
+      # Lien direct sans connexion (dépôt public) :
+      # https://github.com/<dépôt>/releases/download/latest/PhotoSwipe.ipa
+      # La pré-release « latest » est recréée à chaque push de la branche de travail,
+      # ce qui déplace son étiquette sur le dernier commit.
+      - name: Publication dans la pré-release « latest »
+        if: github.event_name == 'push' && github.ref == 'refs/heads/claude/photoswipe-foundations'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHORT="$(git rev-parse --short HEAD)"
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest ipa/PhotoSwipe.ipa \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Dernière version ($SHORT)" \
+            --notes "Build automatique non signé du commit $GITHUB_SHA. À installer avec Sideloadly ou AltStore (signature avec votre Apple ID)."

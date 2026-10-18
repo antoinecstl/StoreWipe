@@ -24,6 +24,7 @@ struct SwipeablePhotoCard: View {
     @State private var dragMode: DragMode?
     @State private var pendingAction: SortAction?
     @State private var containerSize: CGSize = .zero
+    @State private var isPlayingVideo = false
 
     private enum DragMode {
         case swipe
@@ -59,6 +60,24 @@ struct SwipeablePhotoCard: View {
                 .opacity(stampOpacity(for: .markForDeletion))
                 .padding(16)
         }
+        .overlay(alignment: .bottomLeading) {
+            MediaBadge(asset: item.asset)
+                .padding(12)
+        }
+        .overlay {
+            if item.asset.mediaKind == .video, !isZoomed {
+                Button {
+                    isPlayingVideo = true
+                } label: {
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 64))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, .black.opacity(0.45))
+                        .shadow(radius: 4)
+                }
+                .accessibilityLabel(Text("Lire la vidéo"))
+            }
+        }
         .overlay(alignment: .bottomTrailing) {
             if zoomScale > 1.01 {
                 Button {
@@ -73,6 +92,9 @@ struct SwipeablePhotoCard: View {
                 .padding(12)
                 .accessibilityLabel(Text("Revenir à la taille initiale"))
             }
+        }
+        .fullScreenCover(isPresented: $isPlayingVideo) {
+            VideoPlayerScreen(id: item.id)
         }
         .offset(isZoomed ? .zero : offset)
         .rotationEffect(rotation)

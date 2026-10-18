@@ -47,6 +47,10 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Inclure les vidéos", isOn: $settings.includesVideos)
+                        .onChange(of: settings.includesVideos) {
+                            Task { await environment.applyMediaSettings() }
+                        }
                     Picker("Ordre du tri", selection: $settings.sortOrder) {
                         Text("Plus anciennes d'abord").tag(PresentationOrder.oldestFirst)
                         Text("Plus récentes d'abord").tag(PresentationOrder.newestFirst)

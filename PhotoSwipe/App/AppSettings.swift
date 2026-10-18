@@ -11,6 +11,7 @@ final class AppSettings {
         case allowsNetworkForDisplay
         case sortOrder
         case analysisEnabled
+        case includesVideos
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -25,6 +26,11 @@ final class AppSettings {
     /// cette version) ni la vérification des doublons.
     var allowsNetworkForDisplay: Bool {
         didSet { defaults.set(allowsNetworkForDisplay, forKey: key(.allowsNetworkForDisplay)) }
+    }
+
+    /// Inclure les vidéos dans le tri, les compteurs et les analyses.
+    var includesVideos: Bool {
+        didSet { defaults.set(includesVideos, forKey: key(.includesVideos)) }
     }
 
     /// Analyse locale des photos pour proposer des catégories. Désactivée tant que l'utilisateur ne l'a pas demandée.
@@ -43,6 +49,7 @@ final class AppSettings {
         hasCompletedOnboarding = defaults.object(forKey: keyPrefix + Key.hasCompletedOnboarding.rawValue) as? Bool ?? false
         allowsNetworkForDisplay = defaults.object(forKey: keyPrefix + Key.allowsNetworkForDisplay.rawValue) as? Bool ?? true
         analysisEnabled = defaults.object(forKey: keyPrefix + Key.analysisEnabled.rawValue) as? Bool ?? false
+        includesVideos = defaults.object(forKey: keyPrefix + Key.includesVideos.rawValue) as? Bool ?? true
         sortOrder = defaults.string(forKey: keyPrefix + Key.sortOrder.rawValue).flatMap(PresentationOrder.init(rawValue:)) ?? .oldestFirst
     }
 
@@ -51,6 +58,7 @@ final class AppSettings {
         allowsNetworkForDisplay = true
         sortOrder = .oldestFirst
         analysisEnabled = false
+        includesVideos = true
         for key in Key.allCases {
             defaults.removeObject(forKey: self.key(key))
         }

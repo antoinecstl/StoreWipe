@@ -29,6 +29,8 @@ public final class LibraryOverviewModel {
     public private(set) var months: [MonthSummary] = []
     /// Captures d'écran restant à trier (métadonnées système, sans analyse d'image).
     public private(set) var screenshotsToSort = 0
+    /// Vidéos restant à trier.
+    public private(set) var videosToSort = 0
     public private(set) var categories: [CategorySummary] = []
     public private(set) var analysisProgress = AnalysisProgress()
     public private(set) var resumable: ResumableSession?
@@ -48,6 +50,7 @@ public final class LibraryOverviewModel {
         do {
             counts = try await store.decisionCounts()
             screenshotsToSort = try await store.toSortCount(filter: .screenshots)
+            videosToSort = try await store.toSortCount(filter: .videos)
             analysisProgress = try await store.analysisProgress()
             categories = try await loadCategories()
             resumable = try await loadResumable()

@@ -44,10 +44,11 @@ struct DeletionReviewView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 16)
+                    sizeNote(model)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 4)], spacing: 4) {
                         ForEach(model.items) { asset in
                             DeletionCell(
-                                id: asset.id,
+                                asset: asset,
                                 isSelected: model.isSelected(asset.id)
                             ) {
                                 Task { await model.toggle(asset.id) }
@@ -82,6 +83,22 @@ struct DeletionReviewView: View {
             } message: {
                 Text(outcomeMessage(model.outcome))
             }
+        }
+    }
+
+    /// Volume mesuré des fichiers sélectionnés, avec sa couverture ; jamais présenté comme de l'espace garanti.
+    @ViewBuilder
+    private func sizeNote(_ model: DeletionReviewModel) -> some View {
+        let size = model.selectedSize
+        if size.count > 0 {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Environ \(DisplayFormat.byteCount(size.bytes)) pour \(size.count) fichiers sur \(model.selectedCount)")
+                    .font(.subheadline.weight(.semibold))
+                Text("Tailles des fichiers d'origine. L'espace réellement libéré dépend d'iCloud, et les éléments restent 30 jours dans « Supprimés récemment ».")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
         }
     }
 
@@ -146,18 +163,21 @@ struct DeletionReviewView: View {
 }
 
 private struct DeletionCell: View {
-    let id: AssetID
+    let asset: AssetSummary
     let isSelected: Bool
     let toggle: () -> Void
 
     var body: some View {
         Button(action: toggle) {
-            AssetImageView(id: id, pointSize: CGSize(width: 160, height: 160))
+            AssetImageView(id: asset.id, pointSize: CGSize(width: 160, height: 160))
                 .frame(minWidth: 0, maxWidth: .infinity)
                 .aspectRatio(1, contentMode: .fit)
                 .background(Color(.secondarySystemBackground))
                 .clipped()
                 .opacity(isSelected ? 1 : 0.35)
+                .overlay(alignment: .bottomLeading) {
+                    MediaBadge(asset: asset).padding(4)
+                }
                 .overlay(alignment: .topTrailing) {
                     Image(systemName: isSelected ? "trash.circle.fill" : "checkmark.circle.fill")
                         .font(.title3)

@@ -9,6 +9,8 @@ enum Route: Hashable {
     case resume
     case deletion
     case newCategory
+    case largeFiles
+    case duplicates
 }
 
 /// Accueil épuré : une action principale avec la progression, la sélection en attente,
@@ -32,6 +34,7 @@ struct HomeView: View {
                 }
                 notices
                 deletionSection
+                freeUpSection
                 categoriesSection
                 Section("Trier autrement") {
                     NavigationLink(value: Route.months) {
@@ -75,7 +78,7 @@ struct HomeView: View {
                 try? await Task.sleep(for: .milliseconds(300))
                 guard !Task.isCancelled else { return }
                 await overview.refresh()
-                environment.resumeAnalysisIfNeeded()
+                environment.resumeBackgroundWork()
             }
             .task(id: environment.analysis.revision) {
                 await overview.refresh()
@@ -210,6 +213,25 @@ struct HomeView: View {
         }
     }
 
+    /// Raccourcis pour libérer de la place : fichiers les plus lourds et doublons probables.
+    @ViewBuilder
+    private var freeUpSection: some View {
+        Section {
+            NavigationLink(value: Route.largeFiles) {
+                Label("Gros fichiers", systemImage: "externaldrive")
+            }
+            NavigationLink(value: Route.duplicates) {
+                Label("Doublons probables", systemImage: "square.on.square")
+            }
+        } header: {
+            Text("Libérer de la place")
+        } footer: {
+            if environment.sizing.phase == .running {
+                Text("Mesure de la taille des fichiers en cours : \(environment.sizing.coverage.measured) sur \(environment.sizing.coverage.total).")
+            }
+        }
+    }
+
     @ViewBuilder
     private var categoriesSection: some View {
         Section {
@@ -227,6 +249,18 @@ struct HomeView: View {
                 }
                 .swipeActions(edge: .trailing) {
                     bulkButton(title: String(localized: "Captures d'écran"), filter: .screenshots, count: overview.screenshotsToSort)
+                        .tint(.red)
+                }
+            }
+            if overview.videosToSort > 0 {
+                NavigationLink(value: Route.sort(SessionScope(filter: .videos))) {
+                    CountRow(title: "Vidéos", systemImage: "video", count: overview.videosToSort)
+                }
+                .contextMenu {
+                    bulkButton(title: String(localized: "Vidéos"), filter: .videos, count: overview.videosToSort)
+                }
+                .swipeActions(edge: .trailing) {
+                    bulkButton(title: String(localized: "Vidéos"), filter: .videos, count: overview.videosToSort)
                         .tint(.red)
                 }
             }
@@ -425,6 +459,10 @@ struct HomeView: View {
             DeletionReviewView()
         case .newCategory:
             CategoryEditorView()
+        case .largeFiles:
+            LargeFilesView()
+        case .duplicates:
+            DuplicatesView()
         }
     }
 }

@@ -23,6 +23,7 @@ final class AppEnvironment {
     let settings: AppSettings
     let sync: LibrarySyncCoordinator
     let analysis: AnalysisCoordinator
+    let sizing: SizeScanCoordinator
     let overview: LibraryOverviewModel
     let storageIssue: StorageIssue?
     let isDemoMode: Bool
@@ -36,6 +37,7 @@ final class AppEnvironment {
         library: any PhotoLibraryService,
         deleter: any AssetDeleting,
         analyzer: any ImageAnalyzing,
+        sizer: any AssetSizing,
         images: any AssetImageProviding,
         settings: AppSettings,
         storageIssue: StorageIssue?,
@@ -50,11 +52,15 @@ final class AppEnvironment {
         self.isDemoMode = isDemoMode
         self.sync = LibrarySyncCoordinator(library: library, store: store, enumerationOrder: { [settings] in settings.sortOrder })
         self.overview = LibraryOverviewModel(store: store)
+        self.sizing = SizeScanCoordinator(store: store, sizer: sizer)
         self.analysis = AnalysisCoordinator(store: store, analyzer: analyzer, shouldPause: {
             let info = ProcessInfo.processInfo
             return info.isLowPowerModeEnabled || info.thermalState == .serious || info.thermalState == .critical
         })
         self.authorization = library.authorizationStatus()
+        if !settings.includesVideos {
+            Task { await store.setIncludesVideos(false) }
+        }
     }
 
     static func makeDefault() -> AppEnvironment {
@@ -74,6 +80,7 @@ final class AppEnvironment {
             library: library,
             deleter: library,
             analyzer: VisionImageAnalyzer(),
+            sizer: PhotoKitAssetSizer(),
             images: PhotoKitImageProvider(),
             settings: AppSettings(defaults: .standard),
             storageIssue: issue,
@@ -106,6 +113,7 @@ final class AppEnvironment {
             library: library,
             deleter: library,
             analyzer: DemoImageAnalyzer(),
+            sizer: library,
             images: DemoImageProvider(),
             settings: AppSettings(defaults: .standard, keyPrefix: "demo."),
             storageIssue: issue,
@@ -136,7 +144,7 @@ final class AppEnvironment {
         authorization = library.authorizationStatus()
         guard authorization.allowsReading, settings.hasCompletedOnboarding else { return }
         sync.startObservingChanges()
-        resumeAnalysisIfNeeded()
+        resumeBackgroundWork()
         let isStale = sync.lastCompletedAt.map { Date().timeIntervalSince($0) > Self.foregroundResyncInterval } ?? true
         if previous != authorization || isStale {
             sync.requestSync()
@@ -190,6 +198,42 @@ final class AppEnvironment {
 
     func resumeActiveSession() async throws -> SortingSessionModel? {
         try await SessionLauncher.resumeActive(store: store)
+    }
+
+    // MARK: - Mesures et analyses en arrière-plan
+
+    /// Relance la mesure des tailles et, si elle est activée, l'analyse des photos.
+    func resumeBackgroundWork() {
+        guard authorization.allowsReading else { return }
+        if !sizing.isActive {
+            sizing.start()
+        }
+        resumeAnalysisIfNeeded()
+    }
+
+    /// Applique le réglage « inclure les vidéos » aux compteurs, piles et analyses.
+    func applyMediaSettings() async {
+        await store.setIncludesVideos(settings.includesVideos)
+        await overview.refresh()
+        await overview.refreshMonths()
+        await analysis.refreshProgress()
+        resumeAnalysisIfNeeded()
+    }
+
+    /// Marque des éléments précis « à supprimer » (rien n'est supprimé avant confirmation).
+    @discardableResult
+    func markForDeletion(_ ids: [AssetID]) async -> Int {
+        let count = (try? await store.markAssets(ids, as: .markedForDeletion, at: Date())) ?? 0
+        await overview.refresh()
+        return count
+    }
+
+    /// Résout un groupe de doublons : un exemplaire conservé, les autres dans la sélection à supprimer.
+    func resolve(_ group: DuplicateGroup, keeping keeper: AssetID) async {
+        let others = group.members.map(\.id).filter { $0 != keeper }
+        _ = try? await store.markAssets([keeper], as: .kept, at: Date())
+        _ = try? await store.markAssets(others, as: .markedForDeletion, at: Date())
+        await overview.refresh()
     }
 
     // MARK: - Analyse et catégories

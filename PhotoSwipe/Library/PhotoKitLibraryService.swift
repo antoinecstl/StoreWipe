@@ -12,8 +12,7 @@ protocol LimitedSelectionManaging {
 
 /// Implémentation PhotoKit de `PhotoLibraryService`.
 ///
-/// Périmètre V1 : images de la photothèque de l'utilisateur uniquement. Les vidéos, les
-/// photos masquées, les albums partagés et les photos synchronisées depuis un ordinateur
+/// Périmètre : photos et vidéos de la photothèque de l'utilisateur. Les photos masquées, les albums partagés et les photos synchronisées depuis un ordinateur
 /// (non supprimables depuis l'iPhone) sont exclus.
 final class PhotoKitLibraryService: NSObject, PhotoLibraryService, PHPhotoLibraryChangeObserver, @unchecked Sendable {
     // État protégé par `lock` : `photoLibraryDidChange` est appelé sur une file arbitraire.
@@ -54,6 +53,12 @@ final class PhotoKitLibraryService: NSObject, PhotoLibraryService, PHPhotoLibrar
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: order == .oldestFirst)]
         options.includeAssetSourceTypes = [.typeUserLibrary]
+        // Photos et vidéos de la photothèque de l'utilisateur.
+        options.predicate = NSPredicate(
+            format: "mediaType == %d || mediaType == %d",
+            PHAssetMediaType.image.rawValue,
+            PHAssetMediaType.video.rawValue
+        )
         options.includeHiddenAssets = false
         return options
     }
@@ -62,7 +67,7 @@ final class PhotoKitLibraryService: NSObject, PhotoLibraryService, PHPhotoLibrar
         let size = max(1, batchSize)
         return AsyncThrowingStream { continuation in
             let task = Task.detached(priority: .utility) {
-                let result = PHAsset.fetchAssets(with: .image, options: Self.enumerationOptions(order: order))
+                let result = PHAsset.fetchAssets(with: Self.enumerationOptions(order: order))
                 let total = result.count
                 var start = 0
                 while start < total {
@@ -190,7 +195,9 @@ extension AssetSummary {
             pixelHeight: asset.pixelHeight,
             subtypes: subtypes,
             burstIdentifier: asset.burstIdentifier,
-            isFavorite: asset.isFavorite
+            isFavorite: asset.isFavorite,
+            mediaKind: asset.mediaType == .video ? .video : .image,
+            duration: asset.mediaType == .video ? asset.duration : nil
         )
     }
 }

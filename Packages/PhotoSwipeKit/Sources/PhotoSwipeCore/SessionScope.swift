@@ -15,6 +15,8 @@ public struct SessionScope: Sendable, Hashable {
         case undated
         /// Captures d'écran, d'après les métadonnées système (aucune analyse d'image).
         case screenshots
+        /// Vidéos.
+        case videos
         /// Catégorie d'après l'analyse locale (clé de `PhotoCategory`).
         case category(String)
     }
@@ -70,6 +72,7 @@ public struct SessionScope: Sendable, Hashable {
         case .month(let month): filterValue = "month:\(month.rawValue)"
         case .undated: filterValue = "undated"
         case .screenshots: filterValue = "screenshots"
+        case .videos: filterValue = "videos"
         case .category(let key): filterValue = "category:\(key)"
         }
         // Le sens n'est écrit que s'il diffère de l'ancien comportement : les sessions existantes restent lisibles.
@@ -95,6 +98,8 @@ public struct SessionScope: Sendable, Hashable {
             filter = .undated
         case "screenshots":
             filter = .screenshots
+        case "videos":
+            filter = .videos
         case let value where value.hasPrefix("category:") && value.count > "category:".count:
             filter = .category(String(value.dropFirst("category:".count)))
         case let value where value.hasPrefix("month:"):
