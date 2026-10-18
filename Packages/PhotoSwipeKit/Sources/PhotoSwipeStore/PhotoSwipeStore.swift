@@ -13,6 +13,7 @@ public struct QueueRequest: Sendable, Hashable {
     public var cursorInclusive: Bool
     public var excluding: [AssetID]
     public var limit: Int
+    public var order: SortOrder
 
     public init(
         filter: SessionScope.Filter,
@@ -21,7 +22,8 @@ public struct QueueRequest: Sendable, Hashable {
         cursor: SortKey? = nil,
         cursorInclusive: Bool = true,
         excluding: [AssetID] = [],
-        limit: Int
+        limit: Int,
+        order: SortOrder = .newestFirst
     ) {
         self.filter = filter
         self.phase = phase
@@ -30,6 +32,7 @@ public struct QueueRequest: Sendable, Hashable {
         self.cursorInclusive = cursorInclusive
         self.excluding = excluding
         self.limit = limit
+        self.order = order
     }
 }
 
@@ -515,9 +518,10 @@ public actor PhotoSwipeStore {
         var arguments: [SQLValue] = []
         appendFilter(request.filter, to: &clauses, arguments: &arguments)
         appendPhase(request.phase, sessionID: request.sessionID, to: &clauses, arguments: &arguments)
+        let ascending = request.order == .oldestFirst
         if request.phase != .deferred, let cursor = request.cursor {
-            let comparison = request.cursorInclusive ? "<=" : "<"
-            clauses.append("(a.sort_date < ? OR (a.sort_date = ? AND a.local_id \(comparison) ?))")
+            let comparison = Self.afterCursorOperators(ascending: ascending, inclusive: request.cursorInclusive)
+            clauses.append("(a.sort_date \(comparison.date) ? OR (a.sort_date = ? AND a.local_id \(comparison.id) ?))")
             arguments += [.real(cursor.date), .real(cursor.date), .text(cursor.id.rawValue)]
         }
         if !request.excluding.isEmpty {
@@ -527,7 +531,7 @@ public actor PhotoSwipeStore {
         }
         let order = request.phase == .deferred
             ? "d.decided_at ASC, a.local_id ASC"
-            : "a.sort_date DESC, a.local_id DESC"
+            : (ascending ? "a.sort_date ASC, a.local_id ASC" : "a.sort_date DESC, a.local_id DESC")
         arguments.append(.int(request.limit))
         let sql = """
             SELECT \(Self.assetColumns), d.decision, d.decided_at
@@ -555,7 +559,8 @@ public actor PhotoSwipeStore {
             appendFilter(session.scope.filter, to: &clauses, arguments: &arguments)
             appendPhase(phase, sessionID: session.id, to: &clauses, arguments: &arguments)
             if phase == .kept, let cursor = session.cursor {
-                clauses.append("(a.sort_date < ? OR (a.sort_date = ? AND a.local_id <= ?))")
+                let comparison = Self.afterCursorOperators(ascending: session.scope.order == .oldestFirst, inclusive: true)
+                clauses.append("(a.sort_date \(comparison.date) ? OR (a.sort_date = ? AND a.local_id \(comparison.id) ?))")
                 arguments += [.real(cursor.date), .real(cursor.date), .text(cursor.id.rawValue)]
             }
             let sql = """
@@ -565,6 +570,12 @@ public actor PhotoSwipeStore {
             total += Int(try connection.scalarInt(sql, arguments) ?? 0)
         }
         return total
+    }
+
+    /// Opérateurs « après le curseur » selon le sens de présentation.
+    private static func afterCursorOperators(ascending: Bool, inclusive: Bool) -> (date: String, id: String) {
+        let strict = ascending ? ">" : "<"
+        return (strict, inclusive ? strict + "=" : strict)
     }
 
     private func appendFilter(_ filter: SessionScope.Filter, to clauses: inout [String], arguments: inout [SQLValue]) {

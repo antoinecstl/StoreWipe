@@ -1,5 +1,11 @@
 import Foundation
 
+/// Sens de présentation des photos datées.
+public enum SortOrder: String, Sendable, Hashable, CaseIterable {
+    case newestFirst
+    case oldestFirst
+}
+
 /// Périmètre d'une session de tri : quelles photos (filtre) et dans quel état (réserve).
 public struct SessionScope: Sendable, Hashable {
     public enum Filter: Sendable, Hashable {
@@ -22,10 +28,12 @@ public struct SessionScope: Sendable, Hashable {
 
     public var filter: Filter
     public var pool: Pool
+    public var order: SortOrder
 
-    public init(filter: Filter, pool: Pool = .standard) {
+    public init(filter: Filter, pool: Pool = .standard, order: SortOrder = .newestFirst) {
         self.filter = filter
         self.pool = pool
+        self.order = order
     }
 
     public static let everything = SessionScope(filter: .all, pool: .standard)
@@ -61,12 +69,21 @@ public struct SessionScope: Sendable, Hashable {
         case .undated: filterValue = "undated"
         case .screenshots: filterValue = "screenshots"
         }
-        return "\(pool.rawValue)|\(filterValue)"
+        // Le sens n'est écrit que s'il diffère de l'ancien comportement : les sessions existantes restent lisibles.
+        let orderSuffix = order == .oldestFirst ? "|oldest" : ""
+        return "\(pool.rawValue)|\(filterValue)\(orderSuffix)"
     }
 
     public init?(storageValue: String) {
-        let parts = storageValue.split(separator: "|", maxSplits: 1).map(String.init)
-        guard parts.count == 2, let pool = Pool(rawValue: parts[0]) else { return nil }
+        let parts = storageValue.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        guard (2...3).contains(parts.count), let pool = Pool(rawValue: parts[0]) else { return nil }
+        let order: SortOrder
+        if parts.count == 3 {
+            guard parts[2] == "oldest" else { return nil }
+            order = .oldestFirst
+        } else {
+            order = .newestFirst
+        }
         let filter: Filter
         switch parts[1] {
         case "all":
@@ -81,7 +98,7 @@ public struct SessionScope: Sendable, Hashable {
         default:
             return nil
         }
-        self.init(filter: filter, pool: pool)
+        self.init(filter: filter, pool: pool, order: order)
     }
 }
 

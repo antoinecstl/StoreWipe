@@ -23,9 +23,8 @@ public protocol PhotoLibraryService: Sendable {
     /// Affiche la demande système si l'état est indéterminé, puis renvoie le nouvel état.
     func requestAuthorization() async -> LibraryAuthorization
 
-    /// Énumère les photos accessibles (hors vidéos et photos masquées), de la plus récente
-    /// à la plus ancienne, par lots.
-    func assetBatches(batchSize: Int) -> AsyncThrowingStream<[AssetSummary], any Error>
+    /// Énumère les photos accessibles (hors vidéos et photos masquées) par lots, dans le sens demandé.
+    func assetBatches(batchSize: Int, order: SortOrder) -> AsyncThrowingStream<[AssetSummary], any Error>
 
     /// Parmi `ids`, ceux qui existent encore et sont visibles avec l'autorisation actuelle,
     /// y compris les photos masquées. En accès limité, une photo non autorisée est
@@ -35,4 +34,11 @@ public protocol PhotoLibraryService: Sendable {
 
     /// Émet un événement à chaque changement de la photothèque ou de la sélection autorisée.
     func changeNotifications() -> AsyncStream<Void>
+}
+
+extension PhotoLibraryService {
+    /// Énumération de la plus récente à la plus ancienne.
+    public func assetBatches(batchSize: Int) -> AsyncThrowingStream<[AssetSummary], any Error> {
+        assetBatches(batchSize: batchSize, order: .newestFirst)
+    }
 }

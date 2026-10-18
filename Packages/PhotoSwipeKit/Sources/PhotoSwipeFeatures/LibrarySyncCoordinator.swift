@@ -4,7 +4,7 @@ import PhotoSwipeCore
 import PhotoSwipeStore
 
 /// Synchronise l'index local avec la photothèque : énumération complète par lots
-/// (les plus récentes d'abord, pour que le tri puisse commencer tout de suite), puis
+/// (dans le sens du tri, pour que le tri puisse commencer tout de suite), puis
 /// réconciliation prudente des photos disparues.
 @MainActor
 @Observable
@@ -31,6 +31,7 @@ public final class LibrarySyncCoordinator {
     private let store: PhotoSwipeStore
     private let calendar: Calendar
     private let now: @Sendable () -> Date
+    private let enumerationOrder: @MainActor () -> SortOrder
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var rerunRequested = false
     @ObservationIgnored private var observationTask: Task<Void, Never>?
@@ -40,12 +41,14 @@ public final class LibrarySyncCoordinator {
         library: any PhotoLibraryService,
         store: PhotoSwipeStore,
         calendar: Calendar = .current,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        enumerationOrder: @escaping @MainActor () -> SortOrder = { .newestFirst }
     ) {
         self.library = library
         self.store = store
         self.calendar = calendar
         self.now = now
+        self.enumerationOrder = enumerationOrder
     }
 
     public var isRunning: Bool { syncTask != nil }
@@ -114,7 +117,8 @@ public final class LibrarySyncCoordinator {
         processedCount = 0
         do {
             let generation = try await store.beginSyncGeneration()
-            for try await batch in library.assetBatches(batchSize: Self.batchSize) {
+            // Le sens suit celui du tri : le tri peut commencer dès le premier lot, sans désordre ensuite.
+            for try await batch in library.assetBatches(batchSize: Self.batchSize, order: enumerationOrder()) {
                 try Task.checkCancellation()
                 _ = try await store.upsertAssets(batch, generation: generation, calendar: calendar, at: now())
                 processedCount += batch.count

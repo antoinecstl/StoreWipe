@@ -46,7 +46,7 @@ final class AppEnvironment {
         self.settings = settings
         self.storageIssue = storageIssue
         self.isDemoMode = isDemoMode
-        self.sync = LibrarySyncCoordinator(library: library, store: store)
+        self.sync = LibrarySyncCoordinator(library: library, store: store, enumerationOrder: { [settings] in settings.sortOrder })
         self.overview = LibraryOverviewModel(store: store)
         self.authorization = library.authorizationStatus()
     }
@@ -173,7 +173,10 @@ final class AppEnvironment {
     // MARK: - Sessions
 
     func openSession(scope: SessionScope) async throws -> SortingSessionModel {
-        try await SessionLauncher.open(scope: scope, store: store)
+        // Le sens du tri est un réglage : il s'applique à toute nouvelle session.
+        var scope = scope
+        scope.order = settings.sortOrder
+        return try await SessionLauncher.open(scope: scope, store: store)
     }
 
     func resumeActiveSession() async throws -> SortingSessionModel? {

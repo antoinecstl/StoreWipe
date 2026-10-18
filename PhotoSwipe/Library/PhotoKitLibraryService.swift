@@ -50,19 +50,19 @@ final class PhotoKitLibraryService: NSObject, PhotoLibraryService, PHPhotoLibrar
 
     // MARK: Énumération
 
-    static func enumerationOptions() -> PHFetchOptions {
+    static func enumerationOptions(order: SortOrder = .newestFirst) -> PHFetchOptions {
         let options = PHFetchOptions()
-        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: order == .oldestFirst)]
         options.includeAssetSourceTypes = [.typeUserLibrary]
         options.includeHiddenAssets = false
         return options
     }
 
-    func assetBatches(batchSize: Int) -> AsyncThrowingStream<[AssetSummary], any Error> {
+    func assetBatches(batchSize: Int, order: SortOrder) -> AsyncThrowingStream<[AssetSummary], any Error> {
         let size = max(1, batchSize)
         return AsyncThrowingStream { continuation in
             let task = Task.detached(priority: .utility) {
-                let result = PHAsset.fetchAssets(with: .image, options: Self.enumerationOptions())
+                let result = PHAsset.fetchAssets(with: .image, options: Self.enumerationOptions(order: order))
                 let total = result.count
                 var start = 0
                 while start < total {

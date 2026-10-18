@@ -47,6 +47,17 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Picker("Ordre du tri", selection: $settings.sortOrder) {
+                        Text("Plus anciennes d'abord").tag(SortOrder.oldestFirst)
+                        Text("Plus récentes d'abord").tag(SortOrder.newestFirst)
+                    }
+                } header: {
+                    Text("Tri")
+                } footer: {
+                    Text("S'applique aux nouvelles sessions. Une session déjà commencée garde son ordre.")
+                }
+
+                Section {
                     Toggle("Télécharger depuis iCloud pour afficher", isOn: $settings.allowsNetworkForDisplay)
                 } header: {
                     Text("iCloud")

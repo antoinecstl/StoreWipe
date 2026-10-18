@@ -56,12 +56,14 @@ struct SessionScopeTests {
         SessionScope(filter: .all, pool: .keptReview),
         SessionScope(filter: .screenshots, pool: .standard),
         SessionScope(filter: .screenshots, pool: .deferredOnly),
+        SessionScope(filter: .all, pool: .standard, order: .oldestFirst),
+        SessionScope(filter: .month(MonthKey(year: 2024, month: 3)!), pool: .keptReview, order: .oldestFirst),
     ])
     func storageRoundTrip(scope: SessionScope) {
         #expect(SessionScope(storageValue: scope.storageValue) == scope)
     }
 
-    @Test(arguments: ["", "standard", "unknown|all", "standard|month:abc", "standard|month:202413", "standard|weekly"])
+    @Test(arguments: ["", "standard", "unknown|all", "standard|month:abc", "standard|month:202413", "standard|weekly", "standard|all|newest", "standard|all|oldest|x"])
     func rejectsInvalidStorage(value: String) {
         #expect(SessionScope(storageValue: value) == nil)
     }

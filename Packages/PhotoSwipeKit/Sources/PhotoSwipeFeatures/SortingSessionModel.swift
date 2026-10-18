@@ -229,7 +229,8 @@ public final class SortingSessionModel {
                     phase: phase,
                     sessionID: session.id,
                     excluding: buffer.map(\.id) + unavailableIDs + pendingWrites.keys,
-                    limit: wanted
+                    limit: wanted,
+                    order: session.scope.order
                 )
                 switch phase {
                 case .main:
@@ -250,7 +251,8 @@ public final class SortingSessionModel {
                 }
                 if page.count < wanted {
                     if phase == .main, mainCursor != nil, !hasWrappedMain {
-                        // Reprise : présenter ensuite les photos plus récentes que le point de reprise.
+                        // Reprise : présenter ensuite les photos situées avant le point de reprise dans le sens du tri
+                        // (plus récentes en mode « récentes d'abord », plus anciennes arrivées depuis en mode inverse).
                         hasWrappedMain = true
                         mainCursor = nil
                     } else {
