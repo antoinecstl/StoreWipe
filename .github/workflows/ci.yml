@@ -47,3 +47,37 @@ jobs:
           xcodebuild -project PhotoSwipe.xcodeproj -scheme PhotoSwipe \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Release CODE_SIGNING_ALLOWED=NO build
+
+  ipa:
+    name: App iOS · IPA non signée (sideloading)
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sélection de la version stable la plus récente de Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_*.app | grep -iv beta | sort -V | tail -1)"
+          echo "Xcode retenu : $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+      # Compilation pour appareil sans signature : l'outil de sideloading
+      # (Sideloadly, AltStore) signe l'app avec l'Apple ID de l'utilisateur.
+      # Identifiant propre au dépôt : com.example.* est refusé par le portail Apple.
+      - name: Compilation Release (appareil, sans signature)
+        run: |
+          xcodebuild -project PhotoSwipe.xcodeproj -scheme PhotoSwipe \
+            -destination 'generic/platform=iOS' \
+            -configuration Release -derivedDataPath build \
+            PHOTOSWIPE_BUNDLE_ID_PREFIX=io.github.antoinecstl \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+      - name: Assemblage de l'IPA
+        run: |
+          mkdir -p ipa/Payload
+          cp -R build/Build/Products/Release-iphoneos/PhotoSwipe.app ipa/Payload/
+          cd ipa && zip -qry PhotoSwipe.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PhotoSwipe-ipa-${{ github.sha }}
+          path: ipa/PhotoSwipe.ipa
+          retention-days: 14
