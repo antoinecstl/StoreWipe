@@ -5,7 +5,9 @@ import UIKit
 /// Première ouverture : trois principes, puis demande d'accès au moment où l'utilisateur commence.
 struct OnboardingView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.openURL) private var openURL
     @State private var isRequesting = false
+    @State private var problem: String?
 
     var body: some View {
         ScrollView {
@@ -52,10 +54,23 @@ struct OnboardingView: View {
                 .controlSize(.large)
                 .disabled(isRequesting)
 
-                Text("PhotoSwipe vous demandera ensuite l'accès à vos photos.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                if let problem {
+                    Text(verbatim: problem)
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .multilineTextAlignment(.center)
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        Button("Ouvrir les Réglages") {
+                            openURL(url)
+                        }
+                        .font(.footnote)
+                    }
+                } else {
+                    Text("PhotoSwipe vous demandera ensuite l'accès à vos photos.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 12)
@@ -65,11 +80,24 @@ struct OnboardingView: View {
 
     private func start() {
         isRequesting = true
+        problem = nil
         Task {
-            await environment.requestAuthorization()
-            environment.settings.hasCompletedOnboarding = true
+            if await environment.requestAuthorization() {
+                environment.settings.hasCompletedOnboarding = true
+            } else {
+                problem = diagnostic()
+            }
             isRequesting = false
         }
+    }
+
+    /// Informations de diagnostic affichées quand iOS ne répond pas à la demande d'accès.
+    private func diagnostic() -> String {
+        let hasUsageText = Bundle.main.object(forInfoDictionaryKey: "NSPhotoLibraryUsageDescription") != nil
+        return "iOS n'a pas répondu à la demande d'accès aux photos. "
+            + "État : \(environment.library.authorizationStatus()), "
+            + "texte d'autorisation : \(hasUsageText ? "présent" : "absent"), "
+            + "identifiant : \(Bundle.main.bundleIdentifier ?? "inconnu")."
     }
 }
 

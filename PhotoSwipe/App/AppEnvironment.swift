@@ -130,11 +130,25 @@ final class AppEnvironment {
     }
 
     /// Demande l'accès (la fenêtre système n'apparaît que si l'état est indéterminé).
-    func requestAuthorization() async {
-        authorization = await library.requestAuthorization()
-        if authorization.allowsReading {
-            sync.startObservingChanges()
-            sync.requestSync()
+    /// Renvoie `false` si iOS n'a pas répondu dans le délai (fenêtre système jamais affichée) :
+    /// l'interface ne reste alors pas bloquée. Une réponse tardive est quand même prise en compte.
+    func requestAuthorization(timeout: Duration = .seconds(8)) async -> Bool {
+        let library = library
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let gate = ContinuationGate(continuation)
+            Task {
+                let result = await library.requestAuthorization()
+                authorization = result
+                if result.allowsReading {
+                    sync.startObservingChanges()
+                    sync.requestSync()
+                }
+                gate.resume(true)
+            }
+            Task {
+                try? await Task.sleep(for: timeout)
+                gate.resume(false)
+            }
         }
     }
 
@@ -177,6 +191,24 @@ final class AppEnvironment {
         settings.reset()
         await overview.refresh()
         Logger.storage.info("Données de l'application effacées")
+    }
+}
+
+/// Reprend une continuation une seule fois, quel que soit le premier appelant.
+private final class ContinuationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Bool, Never>?
+
+    init(_ continuation: CheckedContinuation<Bool, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume(_ value: Bool) {
+        let pending = lock.withLock { () -> CheckedContinuation<Bool, Never>? in
+            defer { continuation = nil }
+            return continuation
+        }
+        pending?.resume(returning: value)
     }
 }
 
