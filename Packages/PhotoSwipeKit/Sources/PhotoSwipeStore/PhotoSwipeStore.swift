@@ -412,6 +412,21 @@ public actor PhotoSwipeStore {
         ) ?? 0)
     }
 
+    /// Nombre et volume (tailles connues) des photos encore à trier pour un filtre donné.
+    public func toSortSize(filter: SessionScope.Filter) throws -> SizeSummary {
+        var clauses = [visible, "(d.decision IS NULL OR d.decision = 3)", "a.byte_size IS NOT NULL"]
+        var arguments: [SQLValue] = []
+        try appendFilter(filter, to: &clauses, arguments: &arguments)
+        return try connection.query(
+            """
+            SELECT COUNT(*), COALESCE(SUM(a.byte_size), 0)
+            FROM assets a LEFT JOIN decisions d ON d.local_id = a.local_id
+            WHERE \(clauses.joined(separator: " AND "));
+            """,
+            arguments
+        ) { SizeSummary(count: $0.int(0), bytes: $0.int64(1)) }.first ?? SizeSummary()
+    }
+
     public func monthSummaries() throws -> [MonthSummary] {
         try connection.query(
             """
@@ -538,10 +553,12 @@ public actor PhotoSwipeStore {
         var arguments: [SQLValue] = []
         try appendFilter(request.filter, to: &clauses, arguments: &arguments)
         appendPhase(request.phase, sessionID: request.sessionID, to: &clauses, arguments: &arguments)
-        let ascending = request.order == .oldestFirst
+        // Les gros fichiers se présentent du plus lourd au plus léger, quel que soit le sens du tri par date.
+        let orderColumn = request.filter.isSizeOrdered ? "a.byte_size" : "a.sort_date"
+        let ascending = request.order == .oldestFirst && !request.filter.isSizeOrdered
         if request.phase != .deferred, let cursor = request.cursor {
             let comparison = Self.afterCursorOperators(ascending: ascending, inclusive: request.cursorInclusive)
-            clauses.append("(a.sort_date \(comparison.date) ? OR (a.sort_date = ? AND a.local_id \(comparison.id) ?))")
+            clauses.append("(\(orderColumn) \(comparison.date) ? OR (\(orderColumn) = ? AND a.local_id \(comparison.id) ?))")
             arguments += [.real(cursor.date), .real(cursor.date), .text(cursor.id.rawValue)]
         }
         if !request.excluding.isEmpty {
@@ -551,7 +568,7 @@ public actor PhotoSwipeStore {
         }
         let order = request.phase == .deferred
             ? "d.decided_at ASC, a.local_id ASC"
-            : (ascending ? "a.sort_date ASC, a.local_id ASC" : "a.sort_date DESC, a.local_id DESC")
+            : (ascending ? "\(orderColumn) ASC, a.local_id ASC" : "\(orderColumn) DESC, a.local_id DESC")
         arguments.append(.int(request.limit))
         let sql = """
             SELECT \(Self.assetColumns), d.decision, d.decided_at
@@ -579,8 +596,10 @@ public actor PhotoSwipeStore {
             try appendFilter(session.scope.filter, to: &clauses, arguments: &arguments)
             appendPhase(phase, sessionID: session.id, to: &clauses, arguments: &arguments)
             if phase == .kept, let cursor = session.cursor {
-                let comparison = Self.afterCursorOperators(ascending: session.scope.order == .oldestFirst, inclusive: true)
-                clauses.append("(a.sort_date \(comparison.date) ? OR (a.sort_date = ? AND a.local_id \(comparison.id) ?))")
+                let column = session.scope.filter.isSizeOrdered ? "a.byte_size" : "a.sort_date"
+                let ascending = session.scope.order == .oldestFirst && !session.scope.filter.isSizeOrdered
+                let comparison = Self.afterCursorOperators(ascending: ascending, inclusive: true)
+                clauses.append("(\(column) \(comparison.date) ? OR (\(column) = ? AND a.local_id \(comparison.id) ?))")
                 arguments += [.real(cursor.date), .real(cursor.date), .text(cursor.id.rawValue)]
             }
             let sql = """
@@ -611,6 +630,13 @@ public actor PhotoSwipeStore {
             clauses.append("(a.subtypes & \(AssetSubtypes.screenshot.rawValue)) != 0")
         case .videos:
             clauses.append("a.media_type = \(MediaKind.video.rawValue)")
+        case .large(let megabytes, let kind):
+            clauses.append("a.byte_size >= ?")
+            arguments.append(.integer(Int64(megabytes) * 1_000_000))
+            if let kind {
+                clauses.append("a.media_type = ?")
+                arguments.append(.int(kind.rawValue))
+            }
         case .category(let key):
             let rule = try category(forKey: key)?.rule
             let condition: (sql: String, arguments: [SQLValue]) = rule.map { Self.condition(for: $0) } ?? ("0", [])

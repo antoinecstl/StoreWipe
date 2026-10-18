@@ -58,12 +58,16 @@ struct SessionScopeTests {
         SessionScope(filter: .screenshots, pool: .deferredOnly),
         SessionScope(filter: .all, pool: .standard, order: .oldestFirst),
         SessionScope(filter: .month(MonthKey(year: 2024, month: 3)!), pool: .keptReview, order: .oldestFirst),
+        SessionScope(filter: .large(megabytes: 50, kind: nil)),
+        SessionScope(filter: .large(megabytes: 100, kind: .video), pool: .deferredOnly),
+        SessionScope(filter: .large(megabytes: 500, kind: .image), pool: .standard, order: .oldestFirst),
+        SessionScope(filter: .videos),
     ])
     func storageRoundTrip(scope: SessionScope) {
         #expect(SessionScope(storageValue: scope.storageValue) == scope)
     }
 
-    @Test(arguments: ["", "standard", "unknown|all", "standard|month:abc", "standard|month:202413", "standard|weekly", "standard|all|newest", "standard|all|oldest|x"])
+    @Test(arguments: ["", "standard", "unknown|all", "standard|month:abc", "standard|month:202413", "standard|weekly", "standard|all|newest", "standard|all|oldest|x", "standard|large:0", "standard|large:x", "standard|large:50:gif", "standard|large:50:image:x", "standard|large:"])
     func rejectsInvalidStorage(value: String) {
         #expect(SessionScope(storageValue: value) == nil)
     }

@@ -19,6 +19,14 @@ public struct SessionScope: Sendable, Hashable {
         case videos
         /// Catégorie d'après l'analyse locale (clé de `PhotoCategory`).
         case category(String)
+        /// Fichiers d'au moins `megabytes` Mo (1 Mo = 1 000 000 octets), du plus lourd au plus léger.
+        case large(megabytes: Int, kind: MediaKind?)
+
+        /// Vrai si la pile est présentée par taille décroissante plutôt que par date.
+        public var isSizeOrdered: Bool {
+            if case .large = self { return true }
+            return false
+        }
     }
 
     public enum Pool: String, Sendable, Hashable, CaseIterable {
@@ -51,6 +59,11 @@ public struct SessionScope: Sendable, Hashable {
         }
     }
 
+    /// Clé d'ordre d'une photo dans cette pile (date, ou taille pour les gros fichiers).
+    public func sortKey(for asset: AssetSummary) -> SortKey {
+        filter.isSizeOrdered ? SortKey(date: Double(asset.byteSize ?? 0), id: asset.id) : asset.sortKey
+    }
+
     /// Décision à enregistrer pour une action. `nil` signifie « ne rien changer »
     /// (passer une photo déjà conservée pendant une revue).
     public func targetDecision(for action: SortAction) -> Decision? {
@@ -74,6 +87,12 @@ public struct SessionScope: Sendable, Hashable {
         case .screenshots: filterValue = "screenshots"
         case .videos: filterValue = "videos"
         case .category(let key): filterValue = "category:\(key)"
+        case .large(let megabytes, let kind):
+            switch kind {
+            case nil: filterValue = "large:\(megabytes)"
+            case .image?: filterValue = "large:\(megabytes):image"
+            case .video?: filterValue = "large:\(megabytes):video"
+            }
         }
         // Le sens n'est écrit que s'il diffère de l'ancien comportement : les sessions existantes restent lisibles.
         let orderSuffix = order == .oldestFirst ? "|oldest" : ""
@@ -100,6 +119,17 @@ public struct SessionScope: Sendable, Hashable {
             filter = .screenshots
         case "videos":
             filter = .videos
+        case let value where value.hasPrefix("large:"):
+            let parts = value.dropFirst("large:".count).split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+            guard (1...2).contains(parts.count), let megabytes = Int(parts[0]), megabytes > 0 else { return nil }
+            let kind: MediaKind?
+            switch parts.count == 2 ? parts[1] : "" {
+            case "": kind = nil
+            case "image": kind = .image
+            case "video": kind = .video
+            default: return nil
+            }
+            filter = .large(megabytes: megabytes, kind: kind)
         case let value where value.hasPrefix("category:") && value.count > "category:".count:
             filter = .category(String(value.dropFirst("category:".count)))
         case let value where value.hasPrefix("month:"):

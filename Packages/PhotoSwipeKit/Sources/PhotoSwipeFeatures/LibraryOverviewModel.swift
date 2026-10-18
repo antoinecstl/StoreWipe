@@ -31,6 +31,10 @@ public final class LibraryOverviewModel {
     public private(set) var screenshotsToSort = 0
     /// Vidéos restant à trier.
     public private(set) var videosToSort = 0
+    /// Seuil des gros fichiers, en Mo (réglage de l'utilisateur).
+    public var largeThresholdMegabytes = 50
+    /// Gros fichiers restant à trier, avec leur volume mesuré.
+    public private(set) var largeToSort = SizeSummary()
     public private(set) var categories: [CategorySummary] = []
     public private(set) var analysisProgress = AnalysisProgress()
     public private(set) var resumable: ResumableSession?
@@ -51,6 +55,7 @@ public final class LibraryOverviewModel {
             counts = try await store.decisionCounts()
             screenshotsToSort = try await store.toSortCount(filter: .screenshots)
             videosToSort = try await store.toSortCount(filter: .videos)
+            largeToSort = try await store.toSortSize(filter: .large(megabytes: largeThresholdMegabytes, kind: nil))
             analysisProgress = try await store.analysisProgress()
             categories = try await loadCategories()
             resumable = try await loadResumable()

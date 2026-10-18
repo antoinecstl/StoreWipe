@@ -246,7 +246,7 @@ public final class SortingSessionModel {
                 let present = Set(buffer.map(\.id))
                 buffer.append(contentsOf: page.filter { !present.contains($0.id) })
                 if phase == .kept, let last = page.last {
-                    keptCursor = last.asset.sortKey
+                    keptCursor = session.scope.sortKey(for: last.asset)
                     keptCursorInclusive = false
                 }
                 if page.count < wanted {
@@ -283,7 +283,7 @@ public final class SortingSessionModel {
 
     private func persistCursor() async {
         guard let item = buffer.first, item.phase != .deferred else { return }
-        let key = item.asset.sortKey
+        let key = session.scope.sortKey(for: item.asset)
         guard key != session.cursor else { return }
         do {
             try await store.updateCursor(sessionID: session.id, cursor: key)
