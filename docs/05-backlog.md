@@ -33,23 +33,23 @@ Légende : ✅ fait et testé (tests du paquet, Linux et macOS) · 🟡 impléme
 | B-16 | Accessibilité de base | Actions VoiceOver, boutons, raccourcis clavier, Dynamic Type, réduction des animations, contraste | 🟡 |
 | B-17 | Mode démonstration (DEBUG) | `-PhotoSwipeDemoLibrary YES` : photothèque fictive sur simulateur | 🟡 |
 
-## Incrément C — Sélection et suppression via le système (prochain)
+## Incrément C — Sélection et suppression via le système (implémenté, à tester sur iPhone)
 
 | ID | Élément | Critères d'acceptation |
 |----|---------|------------------------|
-| C-01 | Grille « À supprimer » | Ouvrir chaque photo ; retirer de la sélection (= conserver) ; compteur exact |
-| C-02 | Confirmation explicite | Écran récapitulatif + mention iCloud et « Supprimés récemment » avant la demande système |
-| C-03 | Suppression PhotoKit | `PHAssetChangeRequest.deleteAssets` ; annulation par l'utilisateur dans l'alerte iOS → aucun compteur modifié, message neutre |
-| C-04 | Résultat réel | Après l'opération, vérification par identifiant ; seuls les assets réellement absents sont comptés et purgés |
-| C-05 | Changements concurrents | Photos déjà supprimées, devenues inaccessibles ou modifiées depuis la décision : signalées et exclues |
-| C-06 | Volume estimé | Mesuré par lecture des ressources locales ; affiché avec sa couverture (« pour 45 photos sur 50 ») ; jamais promis comme espace libéré immédiatement |
-| C-07 | Bilan de session | Bouton « Revoir la sélection » |
+| C-01 | Grille « À supprimer » | Ouvrir chaque photo ; retirer de la sélection (= conserver) ; compteur exact | ✅ logique · 🟡 UI (retrait d'un toucher ; pas encore de vue plein écran) |
+| C-02 | Confirmation explicite | Écran récapitulatif + mention iCloud et « Supprimés récemment » avant la demande système | 🟡 |
+| C-03 | Suppression PhotoKit | `PHAssetChangeRequest.deleteAssets` ; annulation par l'utilisateur dans l'alerte iOS → aucun compteur modifié, message neutre | ✅ logique · 🟡 PhotoKit |
+| C-04 | Résultat réel | Après l'opération, vérification par identifiant ; seuls les assets réellement absents sont comptés et purgés | ✅ |
+| C-05 | Changements concurrents | Photos déjà supprimées, devenues inaccessibles ou modifiées depuis la décision : signalées et exclues | 🟡 partiel (la sélection ne liste que les photos accessibles ; pas de signalement des modifiées) |
+| C-06 | Volume estimé | Mesuré par lecture des ressources locales ; affiché avec sa couverture (« pour 45 photos sur 50 ») ; jamais promis comme espace libéré immédiatement | ⬜ |
+| C-07 | Bilan de session | Bouton « Revoir la sélection » | 🟡 |
 
 ## Incrément D — Captures d'écran et doublons exacts
 
 | ID | Élément | Critères d'acceptation |
 |----|---------|------------------------|
-| D-01 | Pile « Captures d'écran » | Métadonnées uniquement ; disponible immédiatement après indexation |
+| D-01 | Pile « Captures d'écran » | Métadonnées uniquement ; disponible immédiatement après indexation | ✅ logique · 🟡 UI |
 | D-02 | Migration v2 `resource_digests` | Migration testée depuis v1 |
 | D-03 | Doublons exacts | Conforme à la [spécification](06-doublons-exacts.md) ; tests HEIC/JPEG, retouche, Live Photo, iCloud |
 | D-04 | Groupes de doublons | Exemplaire conservé suggéré avec règle visible ; impossible de tout supprimer |
