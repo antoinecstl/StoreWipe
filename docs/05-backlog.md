@@ -89,3 +89,4 @@ Légende : ✅ fait et testé (tests du paquet, Linux et macOS) · 🟡 impléme
 | Pile « Vidéos », marquage en lot avec confirmation | 🟡 |
 | Raison affichée dans les piles de catégorie (« Proposée car : … ») | 🟡 |
 | Publication de l'IPA non signée dans la pré-release `latest` | ✅ CI |
+| Pile « Gros fichiers » à swiper (du plus lourd au plus léger), seuil réglable, accueil réorganisé en piles | ✅ logique · 🟡 UI |
